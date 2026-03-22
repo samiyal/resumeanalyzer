@@ -4,41 +4,168 @@
 <meta charset="UTF-8">
 <title>Resume Analyzer SaaS</title>
 <style>
-body { font-family: Arial; background: #f4f6f8; margin:0; padding:0; }
-header { background:#0052cc; color:#fff; padding:20px; text-align:center; }
-.container { max-width:700px; margin:20px auto; background:#fff; padding:30px; border-radius:10px; box-shadow:0 0 15px rgba(0,0,0,0.1);}
-input, textarea, button { width:100%; padding:10px; margin:10px 0; border-radius:5px; border:1px solid #ccc; }
-button { background:#0052cc; color:#fff; border:none; cursor:pointer; }
-button:hover{ background:#003d99; }
-#upiModal { position:fixed; top:0; left:0; width:100%; height:100%; display:none; background:rgba(0,0,0,0.5); justify-content:center; align-items:center;}
-.modal-content { background:#fff; padding:20px; border-radius:10px; width:300px; text-align:center;}
+/* ---- Dark theme base ---- */
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212;
+    color: #e0e0e0;
+}
+header {
+    background: linear-gradient(90deg, #0f62fe, #6f42c1);
+    color: white;
+    padding: 25px 20px;
+    text-align: center;
+    font-size: 28px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+.container {
+    max-width: 800px;
+    margin: 30px auto;
+    background-color: #1e1e1e;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+}
+.card {
+    background-color: #2c2c2c;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+input, textarea {
+    width: 100%;
+    padding: 14px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background-color: #1e1e1e;
+    color: #fff;
+    font-size: 16px;
+}
+input::placeholder, textarea::placeholder {
+    color: #aaa;
+}
+button {
+    padding: 15px;
+    width: 100%;
+    border-radius: 8px;
+    border: none;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: 0.3s;
+}
+button.analyze {
+    background: linear-gradient(90deg, #0f62fe, #6f42c1);
+    color: #fff;
+}
+button.analyze:hover {
+    opacity: 0.9;
+}
+button.upgrade {
+    background: linear-gradient(90deg, #ff416c, #ff4b2b);
+    color: #fff;
+}
+button.upgrade:hover {
+    opacity: 0.9;
+}
+#result {
+    white-space: pre-wrap;
+    background-color: #1a1a1a;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 16px;
+    min-height: 100px;
+    margin-top: 10px;
+    overflow-x: auto;
+}
+/* UPI Modal */
+#upiModal {
+    position: fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+.modal-content {
+    background: #1e1e1e;
+    padding: 25px;
+    border-radius: 12px;
+    text-align: center;
+    width: 320px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.7);
+}
+.modal-content h3 {
+    color: #ff416c;
+}
+.modal-content img {
+    margin: 15px 0;
+    width: 200px;
+    height: 200px;
+    border-radius: 12px;
+}
+.modal-content input {
+    margin-top: 10px;
+}
+.modal-content button {
+    margin-top: 15px;
+}
+/* Responsive */
+@media(max-width: 600px){
+    .container { padding: 20px; }
+    input, textarea, button { font-size: 16px; }
+}
 </style>
 </head>
 <body>
-<header>
-<h1>Resume Analyzer SaaS</h1>
-</header>
+
+<header>🚀 Resume Analyzer SaaS</header>
 
 <div class="container">
 
+<!-- Login / Signup Card -->
+<div class="card">
 <h3>Login / Signup</h3>
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Password">
 <button onclick="signup()">Sign Up</button>
 <button onclick="login()">Login</button>
+</div>
 
+<!-- Job Description -->
+<div class="card">
 <h3>Job Description</h3>
-<textarea id="jd_text" rows="5" placeholder="Paste Job Description"></textarea>
+<textarea id="jd_text" rows="6" placeholder="Paste Job Description"></textarea>
+</div>
 
+<!-- Resume Input -->
+<div class="card">
 <h3>Resume</h3>
-<textarea id="resume_text" rows="5" placeholder="Paste Resume Text (optional if uploading file)"></textarea>
+<textarea id="resume_text" rows="6" placeholder="Paste Resume Text (optional if uploading file)"></textarea>
 <input type="file" id="resume_file">
+</div>
 
-<button onclick="analyzeResume()">Analyze Resume</button>
+<!-- Analyze Button -->
+<div class="card">
+<button class="analyze" onclick="analyzeResume()">Analyze Resume</button>
 <pre id="result"></pre>
+</div>
 
-<h3>Upgrade / Paid</h3>
-<button onclick="openUPIModal()">Upgrade Now via UPI</button>
+<!-- Upgrade Button -->
+<div class="card">
+<h3>Upgrade to Unlimited Scans</h3>
+<button class="upgrade" onclick="openUPIModal()">Upgrade Now via UPI</button>
+</div>
 
 </div>
 
@@ -48,7 +175,7 @@ button:hover{ background:#003d99; }
     <h3>Pay via UPI</h3>
     <p>Scan QR or use UPI ID:</p>
     <h2>8700343773@ptsbi</h2>
-    <img src="https://api.qrserver.com/v1/create-qr-code/?data=upi://pay?pa=8700343773@ptsbi&pn=ResumeAnalyzer&am=499&cu=INR&tn=Upgrade&size=200x200">
+    <img src="https://api.qrserver.com/v1/create-qr-code/?data=upi://pay?pa=8700343773@ptsbi&pn=ResumeAnalyzer&am=499&cu=INR&tn=Upgrade&size=200x200" alt="UPI QR">
     <input type="text" id="txn_id" placeholder="Transaction ID">
     <input type="file" id="upi_screenshot" accept="image/*">
     <button onclick="submitUPIPayment()">Submit Payment</button>
