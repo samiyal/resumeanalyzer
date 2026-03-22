@@ -11,15 +11,18 @@ h1 { text-align:center; margin-bottom:40px; color:#22c55e; }
 .container { max-width:900px; margin:0 auto; display:grid; gap:20px; }
 .card { background:#1e293b; padding:20px; border-radius:10px; box-shadow:0 5px 15px rgba(0,0,0,0.2); }
 textarea { width:100%; height:120px; padding:15px; border-radius:8px; border:none; background:#0f172a; color:#f1f5f9; margin-bottom:10px; font-size:14px; resize:vertical; }
-input[type=file] { margin-bottom:15px; }
+input[type=file], input { margin-bottom:15px; padding:10px; border-radius:5px; border:none; background:#0f172a; color:#f1f5f9; width:100%; }
 button { padding:12px 25px; background:#22c55e; border:none; border-radius:8px; cursor:pointer; font-weight:600; transition:0.3s; }
 button:hover { background:#16a34a; }
 #result { background:#1e293b; padding:20px; border-radius:10px; margin-top:20px; white-space:pre-wrap; box-shadow:0 4px 10px rgba(0,0,0,0.2); }
 .score-container { margin-top:15px; background:#0f172a; border-radius:10px; overflow:hidden; height:25px; width:100%; box-shadow:inset 0 0 5px rgba(0,0,0,0.5); }
 .score-bar { height:100%; background:#22c55e; width:0; text-align:right; padding-right:10px; line-height:25px; color:#0f172a; font-weight:600; transition: width 1s ease; }
-.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; }
+.modal { display:flex; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; }
 .modal-content { background:#1e293b; padding:30px; border-radius:10px; width:90%; max-width:400px; }
-input { width:100%; padding:10px; border-radius:5px; border:none; margin-bottom:10px; background:#0f172a; color:#f1f5f9; }
+.modal-content h3 { text-align:center; margin-bottom:20px; color:#22c55e; }
+.modal-content p { text-align:center; color:#f87171; }
+.auth-tab { background:#0f172a; color:#f1f5f9; flex:1; padding:10px; cursor:pointer; border-radius:5px; transition:0.3s; }
+.auth-tab.active { background:#22c55e; color:#0f172a; }
 </style>
 </head>
 <body>
@@ -28,14 +31,18 @@ input { width:100%; padding:10px; border-radius:5px; border:none; margin-bottom:
 
 <div class="container">
 
-  <!-- Login Modal -->
-  <div id="loginModal" class="modal">
+  <!-- Login / Signup Modal -->
+  <div id="authModal" class="modal">
     <div class="modal-content">
-      <h3>Login / Signup</h3>
+      <h3 id="authTitle">Login</h3>
+      <div style="display:flex; gap:10px; margin-bottom:15px;">
+        <div id="loginTab" class="auth-tab active" onclick="switchAuth('login')">Login</div>
+        <div id="signupTab" class="auth-tab" onclick="switchAuth('signup')">Signup</div>
+      </div>
       <input type="email" id="email" placeholder="Email">
       <input type="password" id="password" placeholder="Password">
-      <button onclick="login()">Login / Signup</button>
-      <p id="loginMsg"></p>
+      <button id="authBtn" onclick="submitAuth()">Login</button>
+      <p id="authMsg"></p>
     </div>
   </div>
 
@@ -67,40 +74,50 @@ input { width:100%; padding:10px; border-radius:5px; border:none; margin-bottom:
 
 <script>
 let token = null;
+let authMode = "login";
 
-// Show login modal on page load
-document.getElementById("loginModal").style.display = "flex";
+// Show modal on load
+document.getElementById("authModal").style.display="flex";
 
-async function login(){
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const loginMsg = document.getElementById('loginMsg');
+function switchAuth(mode){
+    authMode = mode;
+    document.getElementById("authTitle").innerText = mode==="login" ? "Login" : "Signup";
+    document.getElementById("authBtn").innerText = mode==="login" ? "Login" : "Signup";
+    document.getElementById("authMsg").innerText="";
+    document.getElementById("loginTab").classList.toggle("active", mode==="login");
+    document.getElementById("signupTab").classList.toggle("active", mode==="signup");
+}
+
+async function submitAuth(){
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const authMsg = document.getElementById("authMsg");
+    const endpoint = authMode==="login"?"/login":"/signup";
 
     try{
-        const res = await fetch("https://resumeanalyzer-5o8p.onrender.com/login",{
+        const res = await fetch(`https://resumeanalyzer-5o8p.onrender.com${endpoint}`,{
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body: JSON.stringify({email, password})
         });
         const data = await res.json();
-        if(res.status===200){
-            token = data.token;
-            loginMsg.innerText = "✅ Logged in!";
-            document.getElementById("loginModal").style.display = "none";
-            document.getElementById("result").innerText = "You can now scan 1 resume for free!";
-        } else {
-            loginMsg.innerText = data.msg;
-        }
-    } catch(err){
-        loginMsg.innerText = "Error connecting to server.";
-    }
+        if(res.status===200 || res.status===201){
+            if(authMode==="login"){
+                token = data.token;
+                authMsg.innerText="✅ Logged in!";
+                document.getElementById("authModal").style.display="none";
+                document.getElementById("result").innerText="You can scan 1 resume for free!";
+            } else {
+                authMsg.innerText="✅ Signup successful! Now login.";
+            }
+        } else { authMsg.innerText = data.msg || "Error occurred"; }
+    } catch(err){ authMsg.innerText="❌ Failed to connect to server."; }
 }
 
 async function analyzeResume(){
     if(!token){ alert("Please login first!"); return; }
-
-    const resultDiv = document.getElementById('result');
-    resultDiv.innerHTML = "Analyzing resume... 🔎";
+    const resultDiv = document.getElementById("result");
+    resultDiv.innerHTML="Analyzing resume... 🔎";
 
     const resumeText = document.getElementById('resume').value;
     const jdText = document.getElementById('jobdesc').value;
@@ -123,23 +140,18 @@ async function analyzeResume(){
         });
         const data = await res.json();
         if(data.error){
-            resultDiv.innerHTML = `<span style="color:#f87171;">❌ ${data.error}</span>`;
+            resultDiv.innerHTML=`<span style="color:#f87171;">❌ ${data.error}</span>`;
         } else {
             const scoreMatch = data.result.match(/ATS Score\s*[:\-]?\s*(\d{1,3})/i);
             let atsScore = scoreMatch ? parseInt(scoreMatch[1]) : null;
             let scoreHTML = '';
-            if(atsScore !== null){
-                scoreHTML = `
-                <div class="score-container">
-                    <div class="score-bar" style="width:${atsScore}%"><span>${atsScore}%</span></div>
-                </div><br>`;
+            if(atsScore!==null){
+                scoreHTML=`<div class="score-container"><div class="score-bar" style="width:${atsScore}%"><span>${atsScore}%</span></div></div><br>`;
             }
             resultDiv.innerHTML = `${scoreHTML}<strong>Improvement Suggestions:</strong>\n${data.result}`;
-            if(atsScore!==null) document.querySelector('.score-bar').style.width = atsScore+'%';
+            if(atsScore!==null) document.querySelector('.score-bar').style.width=atsScore+'%';
         }
-    } catch(err){
-        resultDiv.innerHTML = "<span style='color:#f87171;'>❌ Failed to fetch API.</span>";
-    }
+    } catch(err){ resultDiv.innerHTML="<span style='color:#f87171;'>❌ Failed to fetch API.</span>"; }
 }
 </script>
 
