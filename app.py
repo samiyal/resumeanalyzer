@@ -5,7 +5,7 @@ import os
 
 app = Flask(__name__)
 
-# Enable CORS (VERY IMPORTANT for frontend)
+# Enable CORS for frontend
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # OpenAI client
@@ -22,18 +22,29 @@ def analyze():
     try:
         data = request.get_json()
 
-        if not data or "text" not in data:
-            return jsonify({"error": "No resume text provided"}), 400
+        resume_text = data.get("resume")
+        jd_text = data.get("job_description")
 
-        resume_text = data["text"]
+        if not resume_text or not jd_text:
+            return jsonify({"error": "Both resume and job description are required"}), 400
 
-        # Call OpenAI
+        # Prepare prompt for ATS + suggestions
+        prompt = f"""
+You are an ATS and resume expert. 
+Compare the following resume to this job description.
+1. Give an ATS Score (0-100)
+2. Provide improvement suggestions
+
+Resume:
+{resume_text}
+
+Job Description:
+{jd_text}
+"""
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a professional resume expert. Analyze and improve resumes."},
-                {"role": "user", "content": f"Analyze this resume and give detailed improvements:\n{resume_text}"}
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
 
         result = response.choices[0].message.content
@@ -41,7 +52,6 @@ def analyze():
         return jsonify({"result": result})
 
     except Exception as e:
-        # Return error instead of crashing
         return jsonify({"error": str(e)}), 500
 
 

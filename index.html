@@ -1,65 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>AI Resume Analyzer</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #0f172a;
-      color: white;
-      text-align: center;
-      padding: 50px;
-    }
-    textarea {
-      width: 80%;
-      height: 150px;
-      margin: 10px;
-    }
-    button {
-      padding: 10px 20px;
-      background: #22c55e;
-      border: none;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    #result {
-      margin-top: 20px;
-      white-space: pre-wrap;
-      text-align: left;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Resume Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:#f1f5f9; }
+  header { padding:40px 20px; text-align:center; background:linear-gradient(90deg,#22c55e,#3b82f6); font-size:2rem; font-weight:600; }
+  main { max-width:800px; margin:40px auto; padding:0 20px; }
+  textarea { width:100%; height:150px; padding:15px; border-radius:8px; border:none; font-size:1rem; resize:vertical; margin-bottom:15px; }
+  button { padding:15px 25px; background:#22c55e; border:none; border-radius:8px; color:white; font-size:1rem; cursor:pointer; transition:0.3s; }
+  button:hover { background:#16a34a; }
+  #result { margin-top:30px; background:#1e293b; padding:20px; border-radius:8px; white-space:pre-wrap; font-size:1rem; line-height:1.5; }
+  footer { margin-top:60px; text-align:center; color:#94a3b8; font-size:0.9rem; }
+</style>
 </head>
 <body>
 
-<h1>🚀 AI Resume Analyzer</h1>
+<header>🚀 AI Resume Analyzer</header>
 
-<textarea id="resume" placeholder="Paste your resume here..."></textarea><br>
+<main>
+  <p>Paste the <strong>Job Description</strong> and your <strong>Resume</strong> below:</p>
+  <textarea id="jobdesc" placeholder="Paste Job Description here..."></textarea>
+  <textarea id="resume" placeholder="Paste your Resume here..."></textarea>
+  <button onclick="analyzeResume()">Analyze Resume</button>
+  <div id="result"></div>
+</main>
 
-<button onclick="analyze()">Analyze Resume</button>
-
-<div id="result"></div>
+<footer>Powered by OpenAI GPT • Made with ❤️</footer>
 
 <script>
-function analyze() {
-  document.getElementById("result").innerText = "Analyzing...";
+async function analyzeResume() {
+  const resumeText = document.getElementById('resume').value;
+  const jdText = document.getElementById('jobdesc').value;
+  const resultDiv = document.getElementById('result');
 
-  fetch("https://resumeanalyzer-5o8p.onrender.com/analyze", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      text: document.getElementById("resume").value
-    })
-  })
-  .then(res => res.json())
-  .then(data => {
-    document.getElementById("result").innerText = data.result;
-  })
-  .catch(err => {
-    document.getElementById("result").innerText = "Error: " + err;
-  });
+  if(!resumeText.trim() || !jdText.trim()) {
+    resultDiv.innerText = "⚠️ Please fill both Job Description and Resume!";
+    return;
+  }
+
+  resultDiv.innerText = "Analyzing resume... 🔎";
+
+  try {
+    const response = await fetch("https://resumeanalyzer-5o8p.onrender.com/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resume: resumeText, job_description: jdText })
+    });
+
+    const data = await response.json();
+
+    if(data.error) {
+      resultDiv.innerText = "❌ Error: " + data.error;
+    } else {
+      resultDiv.innerText = data.result;
+    }
+
+  } catch (err) {
+    resultDiv.innerText = "❌ Failed to fetch API. Make sure backend is live.";
+  }
 }
 </script>
 
