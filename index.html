@@ -55,65 +55,108 @@ button { padding:8px 12px; margin-top:8px; border:none; cursor:pointer;}
 <script>
 const API="https://resumeanalyzer-5o8p.onrender.com";
 
-let token = localStorage.getItem("token") || "";
+// Load token from storage
+let token = localStorage.getItem("token");
 
-// -------- AUTH --------
+// -------- SIGNUP --------
 async function signup(){
-let r=await fetch(API+"/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:password.value})});
-let d=await r.json(); alert(d.msg||d.error);
-}
-
-async function login(){
-let r=await fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:password.value})});
+let r=await fetch(API+"/signup",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+email:email.value,
+password:password.value
+})
+});
 let d=await r.json();
-if(d.token){
-token=d.token;
-localStorage.setItem("token", token);
-alert("Logged in");
-}else alert(d.error);
+alert(d.msg||d.error);
 }
 
+// -------- LOGIN --------
+async function login(){
+let r=await fetch(API+"/login",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+email:email.value,
+password:password.value
+})
+});
+
+let d=await r.json();
+
+if(d.token){
+token = d.token;
+
+// ✅ SAVE TOKEN
+localStorage.setItem("token", token);
+
+alert("✅ Login successful");
+}else{
+alert(d.error);
+}
+}
+
+// -------- LOGOUT --------
 function logout(){
 localStorage.removeItem("token");
-token="";
+token = null;
 alert("Logged out");
 }
 
 // -------- ANALYZE --------
 async function analyze(){
-if(!token){ alert("Login first"); return; }
+
+// 🔥 IMPORTANT CHECK
+token = localStorage.getItem("token");
+
+if(!token){
+alert("❌ Please login first");
+return;
+}
 
 let f=new FormData();
-f.append("jd_text",jd_text.value);
-f.append("resume_text",resume_text.value);
+f.append("jd_text", jd_text.value);
+f.append("resume_text", resume_text.value);
 
-if(jd_file.files[0]) f.append("jd_file",jd_file.files[0]);
-if(resume_file.files[0]) f.append("resume_file",resume_file.files[0]);
+if(jd_file.files[0]) f.append("jd_file", jd_file.files[0]);
+if(resume_file.files[0]) f.append("resume_file", resume_file.files[0]);
 
 result.innerText="⏳ Analyzing...";
 
 let r=await fetch(API+"/analyze",{
 method:"POST",
-headers:{Authorization:"Bearer "+token},
+headers:{
+"Authorization": "Bearer " + token   // ✅ CRITICAL
+},
 body:f
 });
 
 let d=await r.json();
-result.innerText=d.result||d.error;
+
+result.innerText = d.result || d.error;
 }
 
 // -------- UPGRADE --------
 async function upgrade(){
-if(!token){ alert("Login first"); return; }
+
+token = localStorage.getItem("token");
+
+if(!token){
+alert("Login first");
+return;
+}
 
 let r=await fetch(API+"/upgrade",{
 method:"POST",
-headers:{Authorization:"Bearer "+token}
+headers:{
+"Authorization": "Bearer " + token
+}
 });
+
 let d=await r.json();
-alert(d.msg||d.error);
+alert(d.msg || d.error);
 }
 </script>
-
 </body>
 </html>
