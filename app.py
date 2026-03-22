@@ -2,11 +2,32 @@ import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
+import fitz  # PyMuPDF
+from docx import Document
 
 app = Flask(__name__)
 CORS(app)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# -------- FILE PARSER --------
+def extract_text(file):
+    filename = file.filename.lower()
+
+    if filename.endswith(".pdf"):
+        doc = fitz.open(stream=file.read(), filetype="pdf")
+        text = ""
+        for page in doc:
+            text += page.get_text()
+        return text
+
+    elif filename.endswith(".docx"):
+        doc = Document(file)
+        return "\n".join([p.text for p in doc.paragraphs])
+
+    else:
+        return file.read().decode("utf-8", errors="ignore")
+
 
 @app.route("/")
 def home():
@@ -23,20 +44,22 @@ def analyze():
         jd_file = request.files.get("jd_file")
 
         if resume_file:
-            resume_text = resume_file.read().decode("utf-8", errors="ignore")
+            resume_text = extract_text(resume_file)
 
         if jd_file:
-            jd_text = jd_file.read().decode("utf-8", errors="ignore")
+            jd_text = extract_text(jd_file)
 
         if not resume_text or not jd_text:
             return jsonify({"msg": "Provide Resume & Job Description"}), 400
 
-        # SPEED OPTIMIZATION
-        resume_text = resume_text[:2000]
-        jd_text = jd_text[:1500]
+        # LIMIT SIZE (IMPORTANT)
+        resume_text = resume_text[:3000]
+        jd_text = jd_text[:2000]
 
         prompt = f"""
-        Compare Resume and Job Description.
+        You are an ATS system.
+
+        Compare resume with job description.
 
         Resume:
         {resume_text}
@@ -44,17 +67,25 @@ def analyze():
         Job Description:
         {jd_text}
 
-        Give:
-        1. Match Percentage
-        2. Missing Skills
-        3. Suggestions to improve
+        Give output in this format:
+
+        ATS Score: (0-100%)
+
+        Missing Keywords:
+        - list
+
+        Matching Skills:
+        - list
+
+        Suggestions:
+        - bullet points
         """
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
-            timeout=15
+            max_tokens=400,
+            timeout=20
         )
 
         result = response.choices[0].message.content
