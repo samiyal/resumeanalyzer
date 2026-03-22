@@ -1,112 +1,98 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 from openai import OpenAI
 import os
 import sqlite3
-from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from werkzeug.utils import secure_filename
-from docx import Document
-import PyPDF2
-import hashlib
 
+# --- Config ---
 app = Flask(__name__)
 CORS(app)
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "supersecretkey")
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret")  # Change in production
 jwt = JWTManager(app)
 
+UPLOAD_FOLDER = "uploads"
+PAYMENT_FOLDER = "payments"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(PAYMENT_FOLDER, exist_ok=True)
+
+# --- OpenAI Client ---
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# PayU config
-PAYU_KEY = os.getenv("PAYU_MERCHANT_KEY")
-PAYU_SALT = os.getenv("PAYU_MERCHANT_SALT")
-PAYU_BASE_URL = os.getenv("PAYU_BASE_URL")  # test or production URL
-
-# Allowed file extensions
-ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt'}
-
 # --- Database ---
-conn = sqlite3.connect('users.db', check_same_thread=False)
+conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS users
-             (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, scans INTEGER DEFAULT 0, paid INTEGER DEFAULT 0)''')
+c.execute("""CREATE TABLE IF NOT EXISTS users(
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             email TEXT UNIQUE,
+             password TEXT,
+             paid INTEGER DEFAULT 0,
+             scans INTEGER DEFAULT 0)""")
 conn.commit()
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# --- Routes ---
 
-def extract_text(file):
-    ext = file.filename.rsplit('.',1)[1].lower()
-    if ext == 'pdf':
-        reader = PyPDF2.PdfReader(file)
-        return "\n".join([page.extract_text() or "" for page in reader.pages])
-    elif ext == 'docx':
-        doc = Document(file)
-        return "\n".join([p.text for p in doc.paragraphs])
-    elif ext == 'txt':
-        return file.read().decode('utf-8')
-    return ""
+@app.route('/')
+def home():
+    return "Resume Analyzer API Running 🚀"
 
-# --- Auth Routes ---
+# Signup
 @app.route('/signup', methods=['POST'])
 def signup():
     data = request.get_json()
     email = data.get("email")
-    password = generate_password_hash(data.get("password"))
+    password = data.get("password")
+    if not email or not password:
+        return jsonify({"error": "Email and password required"}), 400
     try:
-        c.execute("INSERT INTO users (email, password) VALUES (?,?)", (email, password))
+        c.execute("INSERT INTO users(email,password) VALUES (?,?)",(email,password))
         conn.commit()
-        return jsonify({"msg":"User created"}), 201
+        return jsonify({"msg":"Signup successful"})
     except:
-        return jsonify({"msg":"Email already exists"}), 400
+        return jsonify({"error":"Email already exists"}),400
 
+# Login
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    c.execute("SELECT * FROM users WHERE email=?", (data.get("email"),))
+    email = data.get("email")
+    password = data.get("password")
+    c.execute("SELECT * FROM users WHERE email=? AND password=?",(email,password))
     user = c.fetchone()
-    if user and check_password_hash(user[2], data.get("password")):
-        token = create_access_token(identity=user[1])
-        return jsonify({"token": token})
-    return jsonify({"msg":"Invalid credentials"}), 401
+    if not user:
+        return jsonify({"error":"Invalid credentials"}),401
+    token = create_access_token(identity=email)
+    return jsonify({"token":token,"paid":user[3],"scans":user[4]})
 
-# --- Home ---
-@app.route('/')
-def home():
-    return "Resume Analyzer SaaS API Running 🚀"
-
-# --- Analyze ---
+# Analyze Resume
 @app.route('/analyze', methods=['POST'])
 @jwt_required()
 def analyze():
-    user_email = get_jwt_identity()
-    c.execute("SELECT scans, paid FROM users WHERE email=?", (user_email,))
-    user = c.fetchone()
-    scans, paid = user[0], user[1]
+    try:
+        user_email = get_jwt_identity()
+        c.execute("SELECT scans, paid FROM users WHERE email=?",(user_email,))
+        scans, paid = c.fetchone()
+        if scans >=1 and paid==0:
+            return jsonify({"error":"Free scan limit reached. Upgrade to paid."}),403
 
-    if not paid and scans >= 1:
-        return jsonify({"error":"Free scan limit reached. Upgrade to paid."}), 403
+        resume_text = request.form.get("resume_text","")
+        jd_text = request.form.get("jd_text","")
 
-    data = request.form
-    resume_text = data.get("resume", "")
-    jd_text = data.get("job_description", "")
+        resume_file = request.files.get("resume_file",None)
+        if resume_file:
+            filename = secure_filename(resume_file.filename)
+            path = os.path.join(UPLOAD_FOLDER, filename)
+            resume_file.save(path)
+            with open(path,"r",encoding="utf-8",errors="ignore") as f:
+                resume_text = f.read()
 
-    # Uploaded files
-    if 'resume_file' in request.files:
-        file = request.files['resume_file']
-        if file and allowed_file(file.filename):
-            resume_text += "\n" + extract_text(file)
-    if 'jd_file' in request.files:
-        file = request.files['jd_file']
-        if file and allowed_file(file.filename):
-            jd_text += "\n" + extract_text(file)
+        if not resume_text or not jd_text:
+            return jsonify({"error":"Resume and Job Description required"}),400
 
-    if not resume_text.strip() or not jd_text.strip():
-        return jsonify({"error":"Both resume and job description are required"}), 400
-
-    prompt = f"""
-You are an ATS and resume expert.
-Compare the following resume to the job description.
+        prompt = f"""
+You are an ATS and resume expert. 
+Compare the following resume to this job description.
 1. Give an ATS Score (0-100)
 2. Provide improvement suggestions
 
@@ -116,59 +102,39 @@ Resume:
 Job Description:
 {jd_text}
 """
-    try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role":"user","content":prompt}]
         )
         result = response.choices[0].message.content
 
-        # Increment scan count
-        c.execute("UPDATE users SET scans=scans+1 WHERE email=?", (user_email,))
+        # Increment scans
+        c.execute("UPDATE users SET scans=scans+1 WHERE email=?",(user_email,))
         conn.commit()
 
-        return jsonify({"result": result})
+        return jsonify({"result":result})
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error":str(e)}),500
 
-# --- PayU Integration ---
-@app.route('/create-payu-order', methods=['POST'])
+# Manual UPI Payment
+@app.route('/manual-payment', methods=['POST'])
 @jwt_required()
-def create_payu_order():
+def manual_payment():
     user_email = get_jwt_identity()
-    amount = "499"  # ₹4.99
-    txnid = "txn"+user_email.replace("@","").replace(".","")
-    productinfo = "Resume Analyzer Unlimited Plan"
+    if 'screenshot' not in request.files and 'txn_id' not in request.form:
+        return jsonify({"error":"Upload screenshot or enter transaction ID"}),400
 
-    hash_string = f"{PAYU_KEY}|{txnid}|{amount}|{productinfo}|{user_email}|||||||||||{PAYU_SALT}"
-    hashh = hashlib.sha512(hash_string.encode('utf-8')).hexdigest().lower()
+    txn_id = request.form.get('txn_id','')
+    screenshot = request.files.get('screenshot',None)
+    if screenshot:
+        filename = secure_filename(screenshot.filename)
+        screenshot.save(os.path.join(PAYMENT_FOLDER, filename))
 
-    html = f"""
-    <form id="payuForm" action="{PAYU_BASE_URL}" method="post">
-      <input type="hidden" name="key" value="{PAYU_KEY}">
-      <input type="hidden" name="txnid" value="{txnid}">
-      <input type="hidden" name="amount" value="{amount}">
-      <input type="hidden" name="productinfo" value="{productinfo}">
-      <input type="hidden" name="firstname" value="{user_email}">
-      <input type="hidden" name="email" value="{user_email}">
-      <input type="hidden" name="surl" value="https://resumeanalyzer-5o8p.onrender.com/payment-success">
-      <input type="hidden" name="furl" value="https://resumeanalyzer-5o8p.onrender.com/payment-fail">
-      <input type="hidden" name="hash" value="{hashh}">
-    </form>
-    <script>document.getElementById('payuForm').submit();</script>
-    """
-    return render_template_string(html)
-
-@app.route('/payment-success', methods=['POST'])
-def payu_success():
-    email = request.form.get("email")
-    c.execute("UPDATE users SET paid=1 WHERE email=?", (email,))
+    # Mark user as paid
+    c.execute("UPDATE users SET paid=1 WHERE email=?",(user_email,))
     conn.commit()
-    return "✅ Payment successful! Unlimited scans activated."
+    return jsonify({"msg":"Payment submitted. You are now upgraded!"})
 
-@app.route('/payment-fail', methods=['POST'])
-def payu_fail():
-    return "❌ Payment failed. Try again."
-    
 if __name__ == '__main__':
     app.run(debug=True)
