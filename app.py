@@ -129,8 +129,8 @@ def analyze():
             return jsonify({"error": "Provide Resume & JD"}), 400
 
         # -------- LIMIT SIZE --------
-        resume_text = resume_text[:3000]
-        jd_text = jd_text[:2000]
+        resume_text = resume_text[:2000]
+        jd_text = jd_text[:1500]
 
         # -------- PROMPT --------
         prompt = f"""
@@ -150,7 +150,8 @@ Job:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=500
+            max_tokens=300
+            timeout=15        # 🔥 VERY IMPORTANT
         )
 
         result = response.choices[0].message.content
