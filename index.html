@@ -14,9 +14,9 @@ body {
 
 /* HEADER */
 header {
-    padding: 25px;
+    padding: 20px;
     text-align: center;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: bold;
     background: linear-gradient(90deg, #6366f1, #9333ea);
 }
@@ -46,29 +46,36 @@ input, textarea {
     border: 1px solid #334155;
     background: #0f172a;
     color: #fff;
-    font-size: 16px;
+    font-size: 15px;
 }
 
-/* BUTTONS */
+/* BUTTON BASE */
 button {
-    margin-top: 15px;
-    padding: 14px;
-    width: 100%;
+    margin-top: 10px;
+    padding: 12px 18px;
     border-radius: 8px;
     border: none;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: bold;
     cursor: pointer;
 }
 
-/* PRIMARY */
+/* SMALL BUTTONS */
+.btn-small {
+    width: auto;
+    margin-right: 10px;
+}
+
+/* MAIN BUTTON */
 .btn-main {
+    width: 100%;
     background: linear-gradient(90deg, #6366f1, #9333ea);
     color: white;
 }
 
-/* UPGRADE */
+/* UPGRADE BUTTON */
 .btn-upgrade {
+    width: 100%;
     background: linear-gradient(90deg, #f43f5e, #f97316);
     color: white;
 }
@@ -81,6 +88,21 @@ button {
     border-radius: 8px;
     min-height: 120px;
     white-space: pre-wrap;
+}
+
+/* LOADER */
+.loader {
+    border: 4px solid #334155;
+    border-top: 4px solid #6366f1;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 10px auto;
+}
+
+@keyframes spin {
+    100% { transform: rotate(360deg); }
 }
 
 /* MODAL */
@@ -108,21 +130,6 @@ button {
     width:200px;
     margin:15px 0;
 }
-
-/* LOADER */
-.loader {
-    border: 4px solid #334155;
-    border-top: 4px solid #6366f1;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    animation: spin 1s linear infinite;
-    margin: 10px auto;
-}
-
-@keyframes spin {
-    100% { transform: rotate(360deg); }
-}
 </style>
 
 </head>
@@ -137,8 +144,9 @@ button {
 <h3>Login / Signup</h3>
 <input type="email" id="email" placeholder="Enter email">
 <input type="password" id="password" placeholder="Enter password">
-<button onclick="signup()">Sign Up</button>
-<button onclick="login()">Login</button>
+
+<button class="btn-small" onclick="signup()">Sign Up</button>
+<button class="btn-small" onclick="login()">Login</button>
 </div>
 
 <!-- JOB DESCRIPTION -->
@@ -150,7 +158,7 @@ button {
 <!-- RESUME -->
 <div class="card">
 <h3>Resume</h3>
-<textarea id="resume_text" rows="6" placeholder="Paste resume text OR upload file"></textarea>
+<textarea id="resume_text" rows="6" placeholder="Paste resume OR upload file"></textarea>
 <input type="file" id="resume_file">
 </div>
 
@@ -174,7 +182,6 @@ button {
 <div id="upiModal">
   <div class="modal-box">
     <h3>Pay via UPI</h3>
-    <p>UPI ID:</p>
     <h2>8700343773@ptsbi</h2>
 
     <img src="https://api.qrserver.com/v1/create-qr-code/?data=upi://pay?pa=8700343773@ptsbi&pn=ResumeAI&am=499&cu=INR">
@@ -190,11 +197,12 @@ button {
 </div>
 
 <script>
+const API = "https://resumeanalyzer-5o8p.onrender.com";
 let token = "";
 
 // SIGNUP
 async function signup(){
-    const res = await fetch("/signup",{
+    const res = await fetch(API + "/signup",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -208,7 +216,7 @@ async function signup(){
 
 // LOGIN
 async function login(){
-    const res = await fetch("/login",{
+    const res = await fetch(API + "/login",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -239,7 +247,7 @@ async function analyzeResume(){
         formData.append("resume_file", resume_file.files[0]);
     }
 
-    const res = await fetch("/analyze",{
+    const res = await fetch(API + "/analyze",{
         method:"POST",
         headers:{ "Authorization": "Bearer " + token },
         body: formData
@@ -251,11 +259,10 @@ async function analyzeResume(){
     result.innerText = data.result || data.error;
 }
 
-// UPI MODAL
+// UPI
 function openUPI(){
     document.getElementById("upiModal").style.display="flex";
 }
-
 function closeUPI(){
     document.getElementById("upiModal").style.display="none";
 }
@@ -267,7 +274,7 @@ async function submitPayment(){
     if(txn_id.value) formData.append("txn_id", txn_id.value);
     if(upi_screenshot.files[0]) formData.append("screenshot", upi_screenshot.files[0]);
 
-    const res = await fetch("/manual-payment",{
+    const res = await fetch(API + "/manual-payment",{
         method:"POST",
         headers:{ "Authorization": "Bearer " + token },
         body: formData
