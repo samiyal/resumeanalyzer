@@ -2,48 +2,158 @@
 <html>
 <head>
 <title>Resume Analyzer AI</title>
+
 <style>
-body { background:#0f172a; color:white; font-family:sans-serif; }
-.container { max-width:900px; margin:auto; padding:20px; }
-.card { background:#1e293b; padding:20px; margin:15px 0; border-radius:10px; }
-input, textarea { width:100%; padding:12px; margin-top:10px; background:#0f172a; color:white; border:1px solid #334155; border-radius:6px;}
-button { padding:10px 15px; margin-top:10px; border:none; cursor:pointer; border-radius:6px;}
-.btn-small { width:auto; margin-right:10px;}
-.btn-main { width:100%; background:purple; color:white;}
-.btn-upgrade { width:100%; background:red; color:white;}
-#result { white-space:pre-wrap; margin-top:10px; }
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: white;
+}
+
+/* HEADER */
+header {
+    padding: 15px;
+    text-align: center;
+    font-size: 22px;
+    background: linear-gradient(90deg,#6366f1,#9333ea);
+}
+
+/* GRID LAYOUT */
+.container {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    grid-template-rows: auto auto auto;
+    gap: 15px;
+    padding: 15px;
+    height: calc(100vh - 70px);
+}
+
+/* CARDS */
+.card {
+    background: #1e293b;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+}
+
+/* INPUTS */
+input, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    background: #0f172a;
+    color: white;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* BUTTONS */
+button {
+    padding: 8px 12px;
+    margin-top: 8px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+/* SMALL LOGIN BUTTONS */
+.btn-small {
+    width: auto;
+    margin-right: 5px;
+}
+
+/* MAIN */
+.btn-main {
+    background: linear-gradient(90deg,#6366f1,#9333ea);
+    color: white;
+}
+
+/* UPGRADE */
+.btn-upgrade {
+    background: linear-gradient(90deg,#f43f5e,#f97316);
+    color: white;
+}
+
+/* RESULT */
+#result {
+    flex: 1;
+    background: #020617;
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 10px;
+    overflow-y: auto;
+    font-size: 13px;
+}
+
+/* GRID AREAS */
+.login { grid-column: 1; }
+.jd { grid-column: 2; }
+.resume { grid-column: 1; }
+.analyze { grid-column: 2; }
+.upgrade { grid-column: 1 / span 2; text-align:center; }
+
+/* TEXTAREA HEIGHT CONTROL */
+textarea {
+    resize: none;
+    height: 120px;
+}
+
+/* RESPONSIVE */
+@media(max-width: 800px){
+    .container {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+}
 </style>
+
 </head>
 
 <body>
+
+<header>🚀 Resume Analyzer AI</header>
+
 <div class="container">
 
-<div class="card">
-<h3>Login / Signup</h3>
+<!-- LOGIN -->
+<div class="card login">
+<h4>Login</h4>
 <input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
+<div>
 <button class="btn-small" onclick="signup()">Signup</button>
 <button class="btn-small" onclick="login()">Login</button>
 </div>
+</div>
 
-<div class="card">
-<h3>Job Description</h3>
-<textarea id="jd_text"></textarea>
+<!-- JOB DESCRIPTION -->
+<div class="card jd">
+<h4>Job Description</h4>
+<textarea id="jd_text" placeholder="Paste JD or upload"></textarea>
 <input type="file" id="jd_file">
 </div>
 
-<div class="card">
-<h3>Resume</h3>
-<textarea id="resume_text"></textarea>
+<!-- RESUME -->
+<div class="card resume">
+<h4>Resume</h4>
+<textarea id="resume_text" placeholder="Paste resume or upload"></textarea>
 <input type="file" id="resume_file">
 </div>
 
-<div class="card">
+<!-- ANALYZE + RESULT -->
+<div class="card analyze">
+<h4>Analysis</h4>
 <button class="btn-main" onclick="analyze()">Analyze</button>
-<pre id="result"></pre>
+<div id="result"></div>
 </div>
 
-<div class="card">
+<!-- UPGRADE -->
+<div class="card upgrade">
 <button class="btn-upgrade" onclick="pay()">Upgrade via UPI</button>
 </div>
 
@@ -55,13 +165,13 @@ let token="";
 
 async function signup(){
 let r=await fetch(API+"/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:password.value})});
-alert((await r.json()).msg);
+alert((await r.json()).msg || "Error");
 }
 
 async function login(){
 let r=await fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:password.value})});
 let d=await r.json();
-token=d.token; alert("Logged in");
+if(d.token){ token=d.token; alert("Logged in"); } else alert(d.error);
 }
 
 async function analyze(){
