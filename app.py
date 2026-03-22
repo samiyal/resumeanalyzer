@@ -1,124 +1,108 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from werkzeug.utils import secure_filename
 from openai import OpenAI
 import os
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from supabase import create_client, Client
+from flask_jwt_extended import (
+    JWTManager, create_access_token,
+    jwt_required, get_jwt_identity
+)
 
 app = Flask(__name__)
+
+# ---------------- CONFIG ----------------
 CORS(app)
 
-# JWT
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "secret123")
+# ✅ VERY IMPORTANT (FIXED)
+app.config["JWT_SECRET_KEY"] = "my_ultra_secure_resume_analyzer_secret_key_2026_very_long"
+
 jwt = JWTManager(app)
 
-# Upload
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# -------- TEMP USER STORE (Replace with DB later) --------
+users = {}
+
+# ---------------- ROUTES ----------------
 
 @app.route("/")
 def home():
-    return "🚀 API Running"
+    return "🚀 Resume Analyzer API Running"
 
-# ---------------- SIGNUP ----------------
+
+# -------- SIGNUP --------
 @app.route("/signup", methods=["POST"])
 def signup():
-    try:
-        data = request.get_json()
-        email = data.get("email")
-        password = data.get("password")
+    data = request.get_json()
 
-        if not email or not password:
-            return jsonify({"error": "Email & Password required"}), 400
+    email = data.get("email")
+    password = data.get("password")
 
-        existing = supabase.table("users").select("*").eq("email", email).execute()
-        if existing.data:
-            return jsonify({"error": "User already exists"}), 400
+    if not email or not password:
+        return jsonify({"error": "Email & password required"}), 400
 
-        supabase.table("users").insert({
-            "email": email,
-            "password": password,
-            "paid": False,
-            "scans": 0
-        }).execute()
+    if email in users:
+        return jsonify({"error": "User already exists"}), 400
 
-        return jsonify({"msg": "Signup successful"})
+    users[email] = {
+        "password": password,
+        "scans": 1,     # free user → 1 scan
+        "paid": False
+    }
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"msg": "Signup successful"})
 
 
-# ---------------- LOGIN ----------------
+# -------- LOGIN --------
 @app.route("/login", methods=["POST"])
 def login():
-    try:
-        data = request.get_json()
-        email = data.get("email")
-        password = data.get("password")
+    data = request.get_json()
 
-        res = supabase.table("users") \
-            .select("*") \
-            .eq("email", email) \
-            .eq("password", password) \
-            .execute()
+    email = data.get("email")
+    password = data.get("password")
 
-        if not res.data:
-            return jsonify({"error": "Invalid credentials"}), 401
+    user = users.get(email)
 
-        token = create_access_token(identity=email)
+    if not user or user["password"] != password:
+        return jsonify({"error": "Invalid credentials"}), 401
 
-        return jsonify({"token": token})
+    token = create_access_token(identity=email)
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"token": token})
 
 
-# ---------------- ANALYZE ----------------
+# -------- ANALYZE --------
 @app.route("/analyze", methods=["POST"])
 @jwt_required()
 def analyze():
     try:
-        user_email = get_jwt_identity()
+        email = get_jwt_identity()
+        user = users.get(email)
 
-        res = supabase.table("users").select("*").eq("email", user_email).execute()
-        user = res.data[0]
+        if not user:
+            return jsonify({"error": "User not found"}), 404
 
-        if user["scans"] >= 10 and not user["paid"]:
+        # -------- FREE LIMIT --------
+        if not user["paid"] and user["scans"] <= 0:
             return jsonify({"error": "Free limit reached. Upgrade required."}), 403
 
+        # -------- INPUT --------
         resume_text = request.form.get("resume_text", "")
         jd_text = request.form.get("jd_text", "")
 
-        # resume file
-        resume_file = request.files.get("resume_file")
-        if resume_file:
-            path = os.path.join(UPLOAD_FOLDER, secure_filename(resume_file.filename))
-            resume_file.save(path)
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                resume_text = f.read()
-
-        # jd file
-        jd_file = request.files.get("jd_file")
-        if jd_file:
-            path = os.path.join(UPLOAD_FOLDER, secure_filename(jd_file.filename))
-            jd_file.save(path)
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                jd_text = f.read()
-
         if not resume_text or not jd_text:
-            return jsonify({"error": "Resume & JD required"}), 400
+            return jsonify({"error": "Resume and JD required"}), 400
 
+        # ✅ LIMIT SIZE (PREVENT CRASH)
+        resume_text = resume_text[:3000]
+        jd_text = jd_text[:2000]
+
+        # -------- PROMPT --------
         prompt = f"""
-Give ATS score (0-100), improvements, and missing keywords.
+You are an ATS system.
+
+1. Give ATS Score (0-100)
+2. Missing Keywords
+3. Improvements
 
 Resume:
 {resume_text}
@@ -127,40 +111,48 @@ Job Description:
 {jd_text}
 """
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        # -------- OPENAI CALL --------
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500
+            )
 
-        result = response.choices[0].message.content
+            result = response.choices[0].message.content
 
-        supabase.table("users").update({
-            "scans": user["scans"] + 1
-        }).eq("email", user_email).execute()
+        except Exception as e:
+            return jsonify({"error": "AI timeout or server busy"}), 500
 
-        return jsonify({"result": result})
+        # -------- DECREMENT SCAN --------
+        if not user["paid"]:
+            user["scans"] -= 1
+
+        return jsonify({
+            "result": result,
+            "scans_left": user["scans"]
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# ---------------- PAYMENT ----------------
+# -------- UPGRADE --------
 @app.route("/upgrade", methods=["POST"])
 @jwt_required()
 def upgrade():
-    try:
-        user_email = get_jwt_identity()
+    email = get_jwt_identity()
+    user = users.get(email)
 
-        supabase.table("users").update({
-            "paid": True
-        }).eq("email", user_email).execute()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
-        return jsonify({"msg": "Upgraded successfully 🚀"})
+    user["paid"] = True
+    user["scans"] = 999
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"msg": "Upgraded successfully 🎉"})
 
 
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
