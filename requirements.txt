@@ -1,4 +1,6 @@
 flask
+flask-cors
 openai
 gunicorn
-flask-cors
+PyPDF2
+python-docx
