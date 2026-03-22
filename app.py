@@ -9,9 +9,11 @@ from supabase import create_client, Client
 app = Flask(__name__)
 CORS(app)
 
+# JWT
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "secret123")
 jwt = JWTManager(app)
 
+# Upload
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -32,19 +34,16 @@ def home():
 def signup():
     try:
         data = request.get_json()
-
         email = data.get("email")
         password = data.get("password")
 
         if not email or not password:
             return jsonify({"error": "Email & Password required"}), 400
 
-        # check existing
         existing = supabase.table("users").select("*").eq("email", email).execute()
         if existing.data:
             return jsonify({"error": "User already exists"}), 400
 
-        # insert (NO paid/scans from user)
         supabase.table("users").insert({
             "email": email,
             "password": password,
@@ -63,7 +62,6 @@ def signup():
 def login():
     try:
         data = request.get_json()
-
         email = data.get("email")
         password = data.get("password")
 
@@ -91,11 +89,9 @@ def analyze():
     try:
         user_email = get_jwt_identity()
 
-        # fetch user
         res = supabase.table("users").select("*").eq("email", user_email).execute()
         user = res.data[0]
 
-        # free limit
         if user["scans"] >= 1 and not user["paid"]:
             return jsonify({"error": "Free limit reached. Upgrade required."}), 403
 
@@ -138,7 +134,6 @@ Job Description:
 
         result = response.choices[0].message.content
 
-        # update scan count
         supabase.table("users").update({
             "scans": user["scans"] + 1
         }).eq("email", user_email).execute()
@@ -150,9 +145,9 @@ Job Description:
 
 
 # ---------------- PAYMENT ----------------
-@app.route("/manual-payment", methods=["POST"])
+@app.route("/upgrade", methods=["POST"])
 @jwt_required()
-def payment():
+def upgrade():
     try:
         user_email = get_jwt_identity()
 
@@ -160,11 +155,12 @@ def payment():
             "paid": True
         }).eq("email", user_email).execute()
 
-        return jsonify({"msg": "Upgraded successfully"})
+        return jsonify({"msg": "Upgraded successfully 🚀"})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Resume AI</title>
+<title>Resume AI SaaS</title>
 
 <style>
-body { background:#0f172a; color:white; font-family:sans-serif; margin:0; }
+body { background:#0f172a; color:white; font-family:sans-serif; margin:0;}
 .container { display:grid; grid-template-columns:1fr 2fr; gap:15px; padding:15px;}
 .card { background:#1e293b; padding:15px; border-radius:10px;}
 input, textarea { width:100%; padding:10px; margin-top:8px; background:#0f172a; color:white; border:1px solid #334155;}
@@ -21,11 +21,12 @@ button { padding:8px 12px; margin-top:8px; border:none; cursor:pointer;}
 <div class="container">
 
 <div class="card">
-<h4>Login / Signup</h4>
-<input id="email">
-<input id="password" type="password">
+<h4>Account</h4>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
 <button onclick="signup()">Signup</button>
 <button onclick="login()">Login</button>
+<button onclick="logout()">Logout</button>
 </div>
 
 <div class="card">
@@ -46,15 +47,17 @@ button { padding:8px 12px; margin-top:8px; border:none; cursor:pointer;}
 </div>
 
 <div class="card">
-<button class="btn-upgrade" onclick="pay()">Upgrade</button>
+<button class="btn-upgrade" onclick="upgrade()">Upgrade</button>
 </div>
 
 </div>
 
 <script>
 const API="https://resumeanalyzer-5o8p.onrender.com";
-let token="";
 
+let token = localStorage.getItem("token") || "";
+
+// -------- AUTH --------
 async function signup(){
 let r=await fetch(API+"/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:password.value})});
 let d=await r.json(); alert(d.msg||d.error);
@@ -63,24 +66,52 @@ let d=await r.json(); alert(d.msg||d.error);
 async function login(){
 let r=await fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:password.value})});
 let d=await r.json();
-if(d.token){ token=d.token; alert("Logged in"); } else alert(d.error);
+if(d.token){
+token=d.token;
+localStorage.setItem("token", token);
+alert("Logged in");
+}else alert(d.error);
 }
 
+function logout(){
+localStorage.removeItem("token");
+token="";
+alert("Logged out");
+}
+
+// -------- ANALYZE --------
 async function analyze(){
+if(!token){ alert("Login first"); return; }
+
 let f=new FormData();
 f.append("jd_text",jd_text.value);
 f.append("resume_text",resume_text.value);
+
 if(jd_file.files[0]) f.append("jd_file",jd_file.files[0]);
 if(resume_file.files[0]) f.append("resume_file",resume_file.files[0]);
 
-let r=await fetch(API+"/analyze",{method:"POST",headers:{Authorization:"Bearer "+token},body:f});
+result.innerText="⏳ Analyzing...";
+
+let r=await fetch(API+"/analyze",{
+method:"POST",
+headers:{Authorization:"Bearer "+token},
+body:f
+});
+
 let d=await r.json();
 result.innerText=d.result||d.error;
 }
 
-async function pay(){
-let r=await fetch(API+"/manual-payment",{method:"POST",headers:{Authorization:"Bearer "+token}});
-let d=await r.json(); alert(d.msg);
+// -------- UPGRADE --------
+async function upgrade(){
+if(!token){ alert("Login first"); return; }
+
+let r=await fetch(API+"/upgrade",{
+method:"POST",
+headers:{Authorization:"Bearer "+token}
+});
+let d=await r.json();
+alert(d.msg||d.error);
 }
 </script>
 
