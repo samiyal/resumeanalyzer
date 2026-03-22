@@ -6,21 +6,41 @@ from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required, get_jwt_identity
 )
+from supabase import create_client
+import PyPDF2
 
 app = Flask(__name__)
-
-# ---------------- CONFIG ----------------
 CORS(app)
 
-# ✅ VERY IMPORTANT (FIXED)
-app.config["JWT_SECRET_KEY"] = "my_ultra_secure_resume_analyzer_secret_key_2026_very_long"
-
+# ---------------- CONFIG ----------------
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 jwt = JWTManager(app)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# -------- TEMP USER STORE (Replace with DB later) --------
-users = {}
+# ---------------- SUPABASE ----------------
+supabase = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_KEY")
+)
+
+# ---------------- HELPERS ----------------
+def extract_text_from_pdf(file):
+    try:
+        reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        return text
+    except:
+        return ""
+
+def extract_text(file):
+    if file.filename.endswith(".pdf"):
+        return extract_text_from_pdf(file)
+    elif file.filename.endswith(".txt"):
+        return file.read().decode("utf-8")
+    return ""
 
 # ---------------- ROUTES ----------------
 
@@ -28,47 +48,52 @@ users = {}
 def home():
     return "🚀 Resume Analyzer API Running"
 
-
 # -------- SIGNUP --------
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.get_json()
-
     email = data.get("email")
     password = data.get("password")
 
     if not email or not password:
         return jsonify({"error": "Email & password required"}), 400
 
-    if email in users:
+    # check user exists
+    existing = supabase.table("users").select("*").eq("email", email).execute()
+
+    if existing.data:
         return jsonify({"error": "User already exists"}), 400
 
-    users[email] = {
+    # insert user
+    supabase.table("users").insert({
+        "email": email,
         "password": password,
-        "scans": 1,     # free user → 1 scan
+        "scans": 1,
         "paid": False
-    }
+    }).execute()
 
     return jsonify({"msg": "Signup successful"})
-
 
 # -------- LOGIN --------
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-
     email = data.get("email")
     password = data.get("password")
 
-    user = users.get(email)
+    user = supabase.table("users").select("*").eq("email", email).execute()
 
-    if not user or user["password"] != password:
-        return jsonify({"error": "Invalid credentials"}), 401
+    if not user.data:
+        return jsonify({"error": "User not found"}), 404
+
+    user = user.data[0]
+
+    if user["password"] != password:
+        return jsonify({"error": "Invalid password"}), 401
 
     token = create_access_token(identity=email)
 
     return jsonify({"token": token})
-
 
 # -------- ANALYZE --------
 @app.route("/analyze", methods=["POST"])
@@ -76,83 +101,84 @@ def login():
 def analyze():
     try:
         email = get_jwt_identity()
-        user = users.get(email)
 
-        if not user:
+        user_res = supabase.table("users").select("*").eq("email", email).execute()
+        if not user_res.data:
             return jsonify({"error": "User not found"}), 404
+
+        user = user_res.data[0]
 
         # -------- FREE LIMIT --------
         if not user["paid"] and user["scans"] <= 0:
-            return jsonify({"error": "Free limit reached. Upgrade required."}), 403
+            return jsonify({"error": "Free limit reached"}), 403
 
         # -------- INPUT --------
         resume_text = request.form.get("resume_text", "")
         jd_text = request.form.get("jd_text", "")
 
-        if not resume_text or not jd_text:
-            return jsonify({"error": "Resume and JD required"}), 400
+        resume_file = request.files.get("resume_file")
+        jd_file = request.files.get("jd_file")
 
-        # ✅ LIMIT SIZE (PREVENT CRASH)
+        if resume_file:
+            resume_text += extract_text(resume_file)
+
+        if jd_file:
+            jd_text += extract_text(jd_file)
+
+        if not resume_text.strip() or not jd_text.strip():
+            return jsonify({"error": "Provide Resume & JD"}), 400
+
+        # -------- LIMIT SIZE --------
         resume_text = resume_text[:3000]
         jd_text = jd_text[:2000]
 
         # -------- PROMPT --------
         prompt = f"""
-You are an ATS system.
-
-1. Give ATS Score (0-100)
+Give:
+1. ATS Score (0-100)
 2. Missing Keywords
 3. Improvements
 
 Resume:
 {resume_text}
 
-Job Description:
+Job:
 {jd_text}
 """
 
-        # -------- OPENAI CALL --------
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=500
-            )
+        # -------- OPENAI --------
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500
+        )
 
-            result = response.choices[0].message.content
+        result = response.choices[0].message.content
 
-        except Exception as e:
-            return jsonify({"error": "AI timeout or server busy"}), 500
-
-        # -------- DECREMENT SCAN --------
+        # -------- UPDATE SCANS --------
         if not user["paid"]:
-            user["scans"] -= 1
+            supabase.table("users").update({
+                "scans": user["scans"] - 1
+            }).eq("email", email).execute()
 
-        return jsonify({
-            "result": result,
-            "scans_left": user["scans"]
-        })
+        return jsonify({"result": result})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 # -------- UPGRADE --------
 @app.route("/upgrade", methods=["POST"])
 @jwt_required()
 def upgrade():
     email = get_jwt_identity()
-    user = users.get(email)
 
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-
-    user["paid"] = True
-    user["scans"] = 999
+    supabase.table("users").update({
+        "paid": True,
+        "scans": 999
+    }).eq("email", email).execute()
 
     return jsonify({"msg": "Upgraded successfully 🎉"})
 
 
-# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,162 +1,255 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Resume AI SaaS</title>
+<meta charset="UTF-8">
+<title>AI Resume Analyzer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body { background:#0f172a; color:white; font-family:sans-serif; margin:0;}
-.container { display:grid; grid-template-columns:1fr 2fr; gap:15px; padding:15px;}
-.card { background:#1e293b; padding:15px; border-radius:10px;}
-input, textarea { width:100%; padding:10px; margin-top:8px; background:#0f172a; color:white; border:1px solid #334155;}
-button { padding:8px 12px; margin-top:8px; border:none; cursor:pointer;}
-.btn-main { background:#6366f1; color:white;}
-.btn-upgrade { background:red; color:white;}
-#result { white-space:pre-wrap; margin-top:10px;}
-</style>
+body {
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
+}
 
+/* HEADER */
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:15px 30px;
+  background:#020617;
+}
+
+.logo {
+  font-size:20px;
+  font-weight:bold;
+}
+
+.auth-buttons button {
+  margin-left:10px;
+  padding:8px 14px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.login { background:#1e293b; color:white; }
+.signup { background:#2563eb; color:white; }
+
+/* GRID */
+.container {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:20px;
+  padding:20px;
+  height:calc(100vh - 70px);
+}
+
+.card {
+  background:#020617;
+  padding:15px;
+  border-radius:10px;
+  display:flex;
+  flex-direction:column;
+}
+
+textarea {
+  flex:1;
+  background:#0f172a;
+  color:white;
+  border:none;
+  padding:10px;
+  margin-top:10px;
+}
+
+input[type="file"] {
+  margin-top:10px;
+}
+
+/* BUTTON */
+.analyze-btn {
+  margin-top:10px;
+  padding:12px;
+  background:#22c55e;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+/* RESULT */
+.result {
+  white-space:pre-wrap;
+  overflow:auto;
+}
+
+/* MODAL */
+.modal {
+  display:none;
+  position:fixed;
+  top:0;left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.7);
+  justify-content:center;
+  align-items:center;
+}
+
+.modal-content {
+  background:#020617;
+  padding:20px;
+  border-radius:10px;
+  width:300px;
+}
+
+.modal input {
+  width:100%;
+  margin:10px 0;
+  padding:8px;
+}
+
+.close {
+  float:right;
+  cursor:pointer;
+}
+</style>
 </head>
 
 <body>
 
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">🚀 Resume AI</div>
+  <div class="auth-buttons">
+    <button class="login" onclick="openModal('loginModal')">Login</button>
+    <button class="signup" onclick="openModal('signupModal')">Signup</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
 <div class="container">
 
-<div class="card">
-<h4>Account</h4>
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Password">
-<button onclick="signup()">Signup</button>
-<button onclick="login()">Login</button>
-<button onclick="logout()">Logout</button>
+  <!-- JD -->
+  <div class="card">
+    <h3>Job Description</h3>
+    <textarea id="jd_text" placeholder="Paste JD..."></textarea>
+    <input type="file" id="jd_file">
+  </div>
+
+  <!-- RESUME -->
+  <div class="card">
+    <h3>Resume</h3>
+    <textarea id="resume_text" placeholder="Paste Resume..."></textarea>
+    <input type="file" id="resume_file">
+    <button class="analyze-btn" onclick="analyze()">Analyze</button>
+  </div>
+
+  <!-- RESULT -->
+  <div class="card">
+    <h3>Result</h3>
+    <div id="result" class="result">Results will appear here...</div>
+  </div>
+
 </div>
 
-<div class="card">
-<h4>Job Description</h4>
-<textarea id="jd_text"></textarea>
-<input type="file" id="jd_file">
+<!-- LOGIN MODAL -->
+<div id="loginModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeModal('loginModal')">✖</span>
+    <h3>Login</h3>
+    <input id="login_email" placeholder="Email">
+    <input id="login_password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
 </div>
 
-<div class="card">
-<h4>Resume</h4>
-<textarea id="resume_text"></textarea>
-<input type="file" id="resume_file">
-</div>
-
-<div class="card">
-<button class="btn-main" onclick="analyze()">Analyze</button>
-<pre id="result"></pre>
-</div>
-
-<div class="card">
-<button class="btn-upgrade" onclick="upgrade()">Upgrade</button>
-</div>
-
+<!-- SIGNUP MODAL -->
+<div id="signupModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeModal('signupModal')">✖</span>
+    <h3>Signup</h3>
+    <input id="signup_email" placeholder="Email">
+    <input id="signup_password" type="password" placeholder="Password">
+    <button onclick="signup()">Signup</button>
+  </div>
 </div>
 
 <script>
-const API="https://resumeanalyzer-5o8p.onrender.com";
+const API = "https://resumeanalyzer-5o8p.onrender.com";
 
-// Load token from storage
-let token = localStorage.getItem("token");
+// -------- MODALS --------
+function openModal(id){ document.getElementById(id).style.display="flex"; }
+function closeModal(id){ document.getElementById(id).style.display="none"; }
 
-// -------- SIGNUP --------
+// -------- AUTH --------
 async function signup(){
 let r=await fetch(API+"/signup",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({
-email:email.value,
-password:password.value
+email:signup_email.value,
+password:signup_password.value
 })
 });
 let d=await r.json();
 alert(d.msg||d.error);
 }
 
-// -------- LOGIN --------
 async function login(){
 let r=await fetch(API+"/login",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({
-email:email.value,
-password:password.value
+email:login_email.value,
+password:login_password.value
 })
 });
-
 let d=await r.json();
-
 if(d.token){
-token = d.token;
-
-// ✅ SAVE TOKEN
-localStorage.setItem("token", token);
-
-alert("✅ Login successful");
-}else{
-alert(d.error);
-}
+localStorage.setItem("token", d.token);
+alert("Login success");
+closeModal('loginModal');
+}else alert(d.error);
 }
 
-// -------- LOGOUT --------
 function logout(){
 localStorage.removeItem("token");
-token = null;
 alert("Logged out");
 }
 
 // -------- ANALYZE --------
 async function analyze(){
 
-// 🔥 IMPORTANT CHECK
-token = localStorage.getItem("token");
-
-if(!token){
-alert("❌ Please login first");
-return;
-}
-
-let f=new FormData();
-f.append("jd_text", jd_text.value);
-f.append("resume_text", resume_text.value);
-
-if(jd_file.files[0]) f.append("jd_file", jd_file.files[0]);
-if(resume_file.files[0]) f.append("resume_file", resume_file.files[0]);
-
-result.innerText="⏳ Analyzing...";
-
-let r=await fetch(API+"/analyze",{
-method:"POST",
-headers:{
-"Authorization": "Bearer " + token   // ✅ CRITICAL
-},
-body:f
-});
-
-let d=await r.json();
-
-result.innerText = d.result || d.error;
-}
-
-// -------- UPGRADE --------
-async function upgrade(){
-
-token = localStorage.getItem("token");
-
+let token = localStorage.getItem("token");
 if(!token){
 alert("Login first");
 return;
 }
 
-let r=await fetch(API+"/upgrade",{
+let form = new FormData();
+
+// FLEXIBLE INPUT
+if(jd_text.value) form.append("jd_text", jd_text.value);
+if(resume_text.value) form.append("resume_text", resume_text.value);
+
+if(jd_file.files[0]) form.append("jd_file", jd_file.files[0]);
+if(resume_file.files[0]) form.append("resume_file", resume_file.files[0]);
+
+result.innerText="Analyzing...";
+
+let r=await fetch(API+"/analyze",{
 method:"POST",
-headers:{
-"Authorization": "Bearer " + token
-}
+headers:{ "Authorization":"Bearer "+token },
+body:form
 });
 
 let d=await r.json();
-alert(d.msg || d.error);
+result.innerText = d.result || d.error;
 }
 </script>
+
 </body>
 </html>

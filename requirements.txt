@@ -1,8 +1,7 @@
 flask
 flask-cors
-openai
-gunicorn
 flask-jwt-extended
+openai
+PyPDF2
+gunicorn
 supabase
-python-dotenv
-werkzeug
