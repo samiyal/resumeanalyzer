@@ -1,11 +1,13 @@
 import os
 from flask import Flask, request, jsonify
+from flask import send_from_directory
 from flask_cors import CORS
 from openai import OpenAI
 import fitz  # PyMuPDF
 from docx import Document
 
-app = Flask(__name__)
+
+app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -29,10 +31,11 @@ def extract_text(file):
         return file.read().decode("utf-8", errors="ignore")
 
 
-@app.route("/")
-def home():
-    return {"status": "AI Resume Analyzer running 🚀"}
 
+
+@app.route("/")
+def serve_ui():
+    return send_from_directory("static", "index.html")
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
