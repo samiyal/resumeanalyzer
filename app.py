@@ -6,7 +6,6 @@ import os
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from supabase import create_client, Client
 
-# ---------------- APP SETUP ----------------
 app = Flask(__name__)
 CORS(app)
 
@@ -16,21 +15,19 @@ jwt = JWTManager(app)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ---------------- OPENAI ----------------
+# OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# ---------------- SUPABASE ----------------
+# Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ---------------- ROUTES ----------------
-
 @app.route("/")
 def home():
-    return "🚀 API Running (Supabase Connected)"
+    return "🚀 API Running"
 
-# -------- SIGNUP --------
+# ---------------- SIGNUP ----------------
 @app.route("/signup", methods=["POST"])
 def signup():
     try:
@@ -42,13 +39,12 @@ def signup():
         if not email or not password:
             return jsonify({"error": "Email & Password required"}), 400
 
-        # Check existing user
+        # check existing
         existing = supabase.table("users").select("*").eq("email", email).execute()
-
         if existing.data:
             return jsonify({"error": "User already exists"}), 400
 
-        # Insert user
+        # insert (NO paid/scans from user)
         supabase.table("users").insert({
             "email": email,
             "password": password,
@@ -62,7 +58,7 @@ def signup():
         return jsonify({"error": str(e)}), 500
 
 
-# -------- LOGIN --------
+# ---------------- LOGIN ----------------
 @app.route("/login", methods=["POST"])
 def login():
     try:
@@ -82,34 +78,31 @@ def login():
 
         token = create_access_token(identity=email)
 
-        return jsonify({
-            "token": token,
-            "msg": "Login successful"
-        })
+        return jsonify({"token": token})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# -------- ANALYZE --------
+# ---------------- ANALYZE ----------------
 @app.route("/analyze", methods=["POST"])
 @jwt_required()
 def analyze():
     try:
         user_email = get_jwt_identity()
 
-        # Fetch user
+        # fetch user
         res = supabase.table("users").select("*").eq("email", user_email).execute()
         user = res.data[0]
 
-        # Free limit check
+        # free limit
         if user["scans"] >= 1 and not user["paid"]:
-            return jsonify({"error": "Free limit reached. Upgrade."}), 403
+            return jsonify({"error": "Free limit reached. Upgrade required."}), 403
 
         resume_text = request.form.get("resume_text", "")
         jd_text = request.form.get("jd_text", "")
 
-        # Resume file
+        # resume file
         resume_file = request.files.get("resume_file")
         if resume_file:
             path = os.path.join(UPLOAD_FOLDER, secure_filename(resume_file.filename))
@@ -117,7 +110,7 @@ def analyze():
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 resume_text = f.read()
 
-        # JD file
+        # jd file
         jd_file = request.files.get("jd_file")
         if jd_file:
             path = os.path.join(UPLOAD_FOLDER, secure_filename(jd_file.filename))
@@ -129,11 +122,7 @@ def analyze():
             return jsonify({"error": "Resume & JD required"}), 400
 
         prompt = f"""
-You are an ATS expert.
-
-1. Give ATS score (0-100)
-2. Improvements
-3. Missing keywords
+Give ATS score (0-100), improvements, and missing keywords.
 
 Resume:
 {resume_text}
@@ -149,7 +138,7 @@ Job Description:
 
         result = response.choices[0].message.content
 
-        # Update scan count
+        # update scan count
         supabase.table("users").update({
             "scans": user["scans"] + 1
         }).eq("email", user_email).execute()
@@ -160,7 +149,7 @@ Job Description:
         return jsonify({"error": str(e)}), 500
 
 
-# -------- PAYMENT --------
+# ---------------- PAYMENT ----------------
 @app.route("/manual-payment", methods=["POST"])
 @jwt_required()
 def payment():
@@ -171,7 +160,7 @@ def payment():
             "paid": True
         }).eq("email", user_email).execute()
 
-        return jsonify({"msg": "✅ Payment successful. Unlimited access granted!"})
+        return jsonify({"msg": "Upgraded successfully"})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
