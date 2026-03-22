@@ -6,31 +6,28 @@ import os
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from supabase import create_client, Client
 
-# --- App Config ---
 app = Flask(__name__)
 CORS(app)
 
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret")
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "secret")
 jwt = JWTManager(app)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- OpenAI ---
+# OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# --- Supabase ---
+# Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ------------------ ROUTES ------------------
-
 @app.route('/')
 def home():
-    return "🚀 Resume Analyzer API Running (Supabase Connected)"
+    return "🚀 Resume Analyzer API Running"
 
-# ---------- SIGNUP ----------
+# SIGNUP
 @app.route('/signup', methods=['POST'])
 def signup():
     data = request.get_json()
@@ -38,11 +35,11 @@ def signup():
     password = data.get("password")
 
     if not email or not password:
-        return jsonify({"error": "Email and password required"}), 400
+        return jsonify({"error": "Missing fields"}), 400
 
     existing = supabase.table("users").select("*").eq("email", email).execute()
     if existing.data:
-        return jsonify({"error": "Email already exists"}), 400
+        return jsonify({"error": "User already exists"}), 400
 
     supabase.table("users").insert({
         "email": email,
@@ -53,7 +50,7 @@ def signup():
 
     return jsonify({"msg": "Signup successful"})
 
-# ---------- LOGIN ----------
+# LOGIN
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -65,16 +62,11 @@ def login():
     if not res.data:
         return jsonify({"error": "Invalid credentials"}), 401
 
-    user = res.data[0]
     token = create_access_token(identity=email)
 
-    return jsonify({
-        "token": token,
-        "paid": user["paid"],
-        "scans": user["scans"]
-    })
+    return jsonify({"token": token})
 
-# ---------- ANALYZE ----------
+# ANALYZE
 @app.route('/analyze', methods=['POST'])
 @jwt_required()
 def analyze():
@@ -84,22 +76,27 @@ def analyze():
         res = supabase.table("users").select("*").eq("email", user_email).execute()
         user = res.data[0]
 
-        # Free limit
         if user["scans"] >= 1 and not user["paid"]:
-            return jsonify({"error": "Free scan limit reached. Upgrade to paid."}), 403
+            return jsonify({"error": "Free limit reached. Upgrade required."}), 403
 
         resume_text = request.form.get("resume_text", "")
         jd_text = request.form.get("jd_text", "")
 
-        # File upload
-        resume_file = request.files.get("resume_file", None)
+        # Resume file
+        resume_file = request.files.get("resume_file")
         if resume_file:
-            filename = secure_filename(resume_file.filename)
-            path = os.path.join(UPLOAD_FOLDER, filename)
+            path = os.path.join(UPLOAD_FOLDER, secure_filename(resume_file.filename))
             resume_file.save(path)
-
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 resume_text = f.read()
+
+        # JD file
+        jd_file = request.files.get("jd_file")
+        if jd_file:
+            path = os.path.join(UPLOAD_FOLDER, secure_filename(jd_file.filename))
+            jd_file.save(path)
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                jd_text = f.read()
 
         if not resume_text or not jd_text:
             return jsonify({"error": "Resume and Job Description required"}), 400
@@ -107,9 +104,9 @@ def analyze():
         prompt = f"""
 You are an ATS expert.
 
-1. Give ATS Score (0-100)
-2. Give improvements
-3. Highlight missing keywords
+1. Give ATS score (0-100)
+2. Give improvement suggestions
+3. Missing keywords
 
 Resume:
 {resume_text}
@@ -135,19 +132,17 @@ Job Description:
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ---------- UPI PAYMENT ----------
+# PAYMENT
 @app.route('/manual-payment', methods=['POST'])
 @jwt_required()
-def manual_payment():
+def payment():
     user_email = get_jwt_identity()
 
-    # ⚠️ currently auto-upgrades (you can change later)
     supabase.table("users").update({
         "paid": True
     }).eq("email", user_email).execute()
 
-    return jsonify({"msg": "✅ Payment submitted. Unlimited scans activated!"})
+    return jsonify({"msg": "✅ Payment successful. Unlimited access granted!"})
 
-# ---------- RUN ----------
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)

@@ -1,292 +1,84 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
 <title>Resume Analyzer AI</title>
-
 <style>
-body {
-    margin: 0;
-    font-family: 'Segoe UI', sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-}
-
-/* HEADER */
-header {
-    padding: 20px;
-    text-align: center;
-    font-size: 26px;
-    font-weight: bold;
-    background: linear-gradient(90deg, #6366f1, #9333ea);
-}
-
-/* CONTAINER */
-.container {
-    max-width: 900px;
-    margin: 30px auto;
-    padding: 20px;
-}
-
-/* CARD */
-.card {
-    background: #1e293b;
-    padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-}
-
-/* INPUTS */
-input, textarea {
-    width: 100%;
-    padding: 14px;
-    margin-top: 10px;
-    border-radius: 8px;
-    border: 1px solid #334155;
-    background: #0f172a;
-    color: #fff;
-    font-size: 15px;
-}
-
-/* BUTTON BASE */
-button {
-    margin-top: 10px;
-    padding: 12px 18px;
-    border-radius: 8px;
-    border: none;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-/* SMALL BUTTONS */
-.btn-small {
-    width: auto;
-    margin-right: 10px;
-}
-
-/* MAIN BUTTON */
-.btn-main {
-    width: 100%;
-    background: linear-gradient(90deg, #6366f1, #9333ea);
-    color: white;
-}
-
-/* UPGRADE BUTTON */
-.btn-upgrade {
-    width: 100%;
-    background: linear-gradient(90deg, #f43f5e, #f97316);
-    color: white;
-}
-
-/* RESULT */
-#result {
-    margin-top: 15px;
-    background: #020617;
-    padding: 15px;
-    border-radius: 8px;
-    min-height: 120px;
-    white-space: pre-wrap;
-}
-
-/* LOADER */
-.loader {
-    border: 4px solid #334155;
-    border-top: 4px solid #6366f1;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    animation: spin 1s linear infinite;
-    margin: 10px auto;
-}
-
-@keyframes spin {
-    100% { transform: rotate(360deg); }
-}
-
-/* MODAL */
-#upiModal {
-    display: none;
-    position: fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    background: rgba(0,0,0,0.8);
-    justify-content:center;
-    align-items:center;
-}
-
-.modal-box {
-    background:#1e293b;
-    padding:25px;
-    border-radius:12px;
-    text-align:center;
-    width:320px;
-}
-
-.modal-box img {
-    width:200px;
-    margin:15px 0;
-}
+body { background:#0f172a; color:white; font-family:sans-serif; }
+.container { max-width:900px; margin:auto; padding:20px; }
+.card { background:#1e293b; padding:20px; margin:15px 0; border-radius:10px; }
+input, textarea { width:100%; padding:12px; margin-top:10px; background:#0f172a; color:white; border:1px solid #334155; border-radius:6px;}
+button { padding:10px 15px; margin-top:10px; border:none; cursor:pointer; border-radius:6px;}
+.btn-small { width:auto; margin-right:10px;}
+.btn-main { width:100%; background:purple; color:white;}
+.btn-upgrade { width:100%; background:red; color:white;}
+#result { white-space:pre-wrap; margin-top:10px; }
 </style>
-
 </head>
+
 <body>
-
-<header>🚀 Resume Analyzer AI</header>
-
 <div class="container">
 
-<!-- LOGIN -->
 <div class="card">
 <h3>Login / Signup</h3>
-<input type="email" id="email" placeholder="Enter email">
-<input type="password" id="password" placeholder="Enter password">
-
-<button class="btn-small" onclick="signup()">Sign Up</button>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<button class="btn-small" onclick="signup()">Signup</button>
 <button class="btn-small" onclick="login()">Login</button>
 </div>
 
-<!-- JOB DESCRIPTION -->
 <div class="card">
 <h3>Job Description</h3>
-<textarea id="jd_text" rows="6" placeholder="Paste job description"></textarea>
+<textarea id="jd_text"></textarea>
+<input type="file" id="jd_file">
 </div>
 
-<!-- RESUME -->
 <div class="card">
 <h3>Resume</h3>
-<textarea id="resume_text" rows="6" placeholder="Paste resume OR upload file"></textarea>
+<textarea id="resume_text"></textarea>
 <input type="file" id="resume_file">
 </div>
 
-<!-- ANALYZE -->
 <div class="card">
-<button class="btn-main" onclick="analyzeResume()">Analyze Resume</button>
-<div id="loading" style="display:none;" class="loader"></div>
+<button class="btn-main" onclick="analyze()">Analyze</button>
 <pre id="result"></pre>
 </div>
 
-<!-- UPGRADE -->
 <div class="card">
-<h3>Upgrade Plan</h3>
-<p>Free: 1 scan | Paid: Unlimited</p>
-<button class="btn-upgrade" onclick="openUPI()">Upgrade via UPI</button>
+<button class="btn-upgrade" onclick="pay()">Upgrade via UPI</button>
 </div>
 
-</div>
-
-<!-- UPI MODAL -->
-<div id="upiModal">
-  <div class="modal-box">
-    <h3>Pay via UPI</h3>
-    <h2>8700343773@ptsbi</h2>
-
-    <img src="https://api.qrserver.com/v1/create-qr-code/?data=upi://pay?pa=8700343773@ptsbi&pn=ResumeAI&am=499&cu=INR">
-
-    <input type="text" id="txn_id" placeholder="Transaction ID">
-    <input type="file" id="upi_screenshot">
-
-    <button onclick="submitPayment()">Submit Payment</button>
-    <button onclick="closeUPI()">Cancel</button>
-
-    <p id="payMsg"></p>
-  </div>
 </div>
 
 <script>
-const API = "https://resumeanalyzer-5o8p.onrender.com";
-let token = "";
+const API="https://resumeanalyzer-5o8p.onrender.com";
+let token="";
 
-// SIGNUP
 async function signup(){
-    const res = await fetch(API + "/signup",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-            email: email.value,
-            password: password.value
-        })
-    });
-    const data = await res.json();
-    alert(data.msg || data.error);
+let r=await fetch(API+"/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:password.value})});
+alert((await r.json()).msg);
 }
 
-// LOGIN
 async function login(){
-    const res = await fetch(API + "/login",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-            email: email.value,
-            password: password.value
-        })
-    });
-    const data = await res.json();
-
-    if(data.token){
-        token = data.token;
-        alert("Login success");
-    } else {
-        alert(data.error);
-    }
+let r=await fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:password.value})});
+let d=await r.json();
+token=d.token; alert("Logged in");
 }
 
-// ANALYZE
-async function analyzeResume(){
-    document.getElementById("loading").style.display = "block";
-    result.innerText = "";
+async function analyze(){
+let f=new FormData();
+f.append("jd_text",jd_text.value);
+f.append("resume_text",resume_text.value);
+if(jd_file.files[0]) f.append("jd_file",jd_file.files[0]);
+if(resume_file.files[0]) f.append("resume_file",resume_file.files[0]);
 
-    const formData = new FormData();
-    formData.append("jd_text", jd_text.value);
-    formData.append("resume_text", resume_text.value);
-
-    if(resume_file.files[0]){
-        formData.append("resume_file", resume_file.files[0]);
-    }
-
-    const res = await fetch(API + "/analyze",{
-        method:"POST",
-        headers:{ "Authorization": "Bearer " + token },
-        body: formData
-    });
-
-    const data = await res.json();
-
-    document.getElementById("loading").style.display = "none";
-    result.innerText = data.result || data.error;
+let r=await fetch(API+"/analyze",{method:"POST",headers:{"Authorization":"Bearer "+token},body:f});
+let d=await r.json();
+result.innerText=d.result||d.error;
 }
 
-// UPI
-function openUPI(){
-    document.getElementById("upiModal").style.display="flex";
-}
-function closeUPI(){
-    document.getElementById("upiModal").style.display="none";
-}
-
-// PAYMENT
-async function submitPayment(){
-    const formData = new FormData();
-
-    if(txn_id.value) formData.append("txn_id", txn_id.value);
-    if(upi_screenshot.files[0]) formData.append("screenshot", upi_screenshot.files[0]);
-
-    const res = await fetch(API + "/manual-payment",{
-        method:"POST",
-        headers:{ "Authorization": "Bearer " + token },
-        body: formData
-    });
-
-    const data = await res.json();
-    payMsg.innerText = data.msg || data.error;
-
-    if(data.msg){
-        closeUPI();
-        alert("Upgraded!");
-    }
+async function pay(){
+let r=await fetch(API+"/manual-payment",{method:"POST",headers:{"Authorization":"Bearer "+token}});
+alert((await r.json()).msg);
 }
 </script>
 
