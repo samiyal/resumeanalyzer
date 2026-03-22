@@ -9,7 +9,7 @@
   body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:#f1f5f9; }
   header { padding:40px 20px; text-align:center; background:linear-gradient(90deg,#22c55e,#3b82f6); font-size:2rem; font-weight:600; }
   main { max-width:800px; margin:40px auto; padding:0 20px; }
-  textarea { width:100%; height:150px; padding:15px; border-radius:8px; border:none; font-size:1rem; resize:vertical; margin-bottom:15px; }
+  textarea { width:100%; height:150px; padding:15px; border-radius:8px; border:none; font-size:1rem; resize:vertical; margin-bottom:15px; background:#1e293b; color:#f1f5f9; }
   button { padding:15px 25px; background:#22c55e; border:none; border-radius:8px; color:white; font-size:1rem; cursor:pointer; transition:0.3s; }
   button:hover { background:#16a34a; }
   #result { margin-top:30px; background:#1e293b; padding:20px; border-radius:8px; white-space:pre-wrap; font-size:1rem; line-height:1.5; }
@@ -22,8 +22,29 @@
 
 <main>
   <p>Paste the <strong>Job Description</strong> and your <strong>Resume</strong> below:</p>
-  <textarea id="jobdesc" placeholder="Paste Job Description here..."></textarea>
-  <textarea id="resume" placeholder="Paste your Resume here..."></textarea>
+  <textarea id="jobdesc" placeholder="Paste Job Description here...">We are looking for a Python Backend Developer to join our team. 
+Requirements:
+- Strong experience with Python and Flask/Django
+- Experience with REST APIs and SQL databases
+- Knowledge of cloud platforms (AWS/GCP)
+- Ability to write clean, maintainable code
+- Strong communication and teamwork skills</textarea>
+  
+  <textarea id="resume" placeholder="Paste your Resume here...">John Doe
+Email: john.doe@example.com
+LinkedIn: linkedin.com/in/johndoe
+
+Experience:
+- Backend Developer at XYZ Corp (2 years)
+  - Built REST APIs in Python and Flask
+  - Worked with PostgreSQL and MySQL databases
+  - Collaborated with frontend team to deliver features
+  - Deployed applications on AWS
+
+Skills:
+- Python, Flask, SQL, REST APIs, AWS
+- Git, Docker, Unit Testing</textarea>
+  
   <button onclick="analyzeResume()">Analyze Resume</button>
   <div id="result"></div>
 </main>
