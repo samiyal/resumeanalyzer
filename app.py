@@ -92,7 +92,7 @@ def analyze():
         res = supabase.table("users").select("*").eq("email", user_email).execute()
         user = res.data[0]
 
-        if user["scans"] >= 1 and not user["paid"]:
+        if user["scans"] >= 10 and not user["paid"]:
             return jsonify({"error": "Free limit reached. Upgrade required."}), 403
 
         resume_text = request.form.get("resume_text", "")
