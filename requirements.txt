@@ -5,3 +5,5 @@ openai
 PyPDF2
 gunicorn
 supabase
+pymupdf
+python-docx
