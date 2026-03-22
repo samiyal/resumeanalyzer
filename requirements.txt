@@ -1,6 +1,8 @@
 flask
 flask-cors
 openai
-gunicorn
+flask-jwt-extended
 PyPDF2
 python-docx
+werkzeug
+gunicorn

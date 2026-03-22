@@ -6,35 +6,20 @@
 <title>AI Resume Analyzer SaaS</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
-  /* Reset & Body */
-  * { box-sizing: border-box; margin:0; padding:0; }
-  body { font-family:'Inter', sans-serif; background:#0f172a; color:#f1f5f9; padding:20px; }
-
-  h1 { text-align:center; margin-bottom:40px; font-weight:600; color:#22c55e; }
-
-  /* Container */
-  .container { max-width:900px; margin:0 auto; display:grid; gap:30px; }
-
-  /* Card Styles */
-  .card { background:#1e293b; padding:20px; border-radius:10px; box-shadow:0 5px 15px rgba(0,0,0,0.2); }
-  .card h3 { margin-bottom:10px; color:#f1f5f9; }
-
-  textarea { width:100%; height:120px; padding:15px; border-radius:8px; border:none; background:#0f172a; color:#f1f5f9; margin-bottom:10px; font-size:14px; resize:vertical; }
-  input[type=file] { margin-bottom:15px; color:#f1f5f9; }
-
-  /* Button */
-  button { padding:12px 25px; background:#22c55e; border:none; border-radius:8px; cursor:pointer; font-weight:600; transition:0.3s; }
-  button:hover { background:#16a34a; }
-
-  /* Result box */
-  #result { background:#1e293b; padding:20px; border-radius:10px; margin-top:20px; white-space:pre-wrap; box-shadow:0 4px 10px rgba(0,0,0,0.2); }
-
-  /* ATS Score */
-  .score-container { margin-top:15px; background:#0f172a; border-radius:10px; overflow:hidden; height:25px; width:100%; box-shadow:inset 0 0 5px rgba(0,0,0,0.5); }
-  .score-bar { height:100%; background:#22c55e; width:0; text-align:right; padding-right:10px; line-height:25px; color:#0f172a; font-weight:600; transition: width 1s ease; }
-
-  /* Footer note */
-  footer { text-align:center; margin-top:40px; color:#94a3b8; font-size:13px; }
+body { font-family:'Inter', sans-serif; background:#0f172a; color:#f1f5f9; padding:20px; }
+h1 { text-align:center; margin-bottom:40px; color:#22c55e; }
+.container { max-width:900px; margin:0 auto; display:grid; gap:20px; }
+.card { background:#1e293b; padding:20px; border-radius:10px; box-shadow:0 5px 15px rgba(0,0,0,0.2); }
+textarea { width:100%; height:120px; padding:15px; border-radius:8px; border:none; background:#0f172a; color:#f1f5f9; margin-bottom:10px; font-size:14px; resize:vertical; }
+input[type=file] { margin-bottom:15px; }
+button { padding:12px 25px; background:#22c55e; border:none; border-radius:8px; cursor:pointer; font-weight:600; transition:0.3s; }
+button:hover { background:#16a34a; }
+#result { background:#1e293b; padding:20px; border-radius:10px; margin-top:20px; white-space:pre-wrap; box-shadow:0 4px 10px rgba(0,0,0,0.2); }
+.score-container { margin-top:15px; background:#0f172a; border-radius:10px; overflow:hidden; height:25px; width:100%; box-shadow:inset 0 0 5px rgba(0,0,0,0.5); }
+.score-bar { height:100%; background:#22c55e; width:0; text-align:right; padding-right:10px; line-height:25px; color:#0f172a; font-weight:600; transition: width 1s ease; }
+.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; }
+.modal-content { background:#1e293b; padding:30px; border-radius:10px; width:90%; max-width:400px; }
+input { width:100%; padding:10px; border-radius:5px; border:none; margin-bottom:10px; background:#0f172a; color:#f1f5f9; }
 </style>
 </head>
 <body>
@@ -43,20 +28,28 @@
 
 <div class="container">
 
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <h3>Login / Signup</h3>
+      <input type="email" id="email" placeholder="Email">
+      <input type="password" id="password" placeholder="Password">
+      <button onclick="login()">Login / Signup</button>
+      <p id="loginMsg"></p>
+    </div>
+  </div>
+
   <!-- Job Description Card -->
   <div class="card">
     <h3>Job Description</h3>
-    <textarea id="jobdesc" placeholder="Paste Job Description here...">We are looking for a Python Backend Developer with experience in Flask, SQL, AWS, and REST APIs.</textarea>
+    <textarea id="jobdesc" placeholder="Paste Job Description here..."></textarea>
     <input type="file" id="jd_file" accept=".pdf,.docx,.txt">
   </div>
 
   <!-- Resume Card -->
   <div class="card">
     <h3>Resume</h3>
-    <textarea id="resume" placeholder="Paste Resume here...">John Doe
-Email: john.doe@example.com
-Experience: Backend Developer with Python, Flask, SQL, AWS
-Skills: Python, Flask, SQL, REST APIs, Git, Docker</textarea>
+    <textarea id="resume" placeholder="Paste Resume here..."></textarea>
     <input type="file" id="resume_file" accept=".pdf,.docx,.txt">
   </div>
 
@@ -67,15 +60,45 @@ Skills: Python, Flask, SQL, REST APIs, Git, Docker</textarea>
 
   <!-- Result Card -->
   <div class="card" id="result">
-    Paste your resume and job description, then click "Analyze Resume" to see results.
+    Please login first to scan your resume.
   </div>
 
 </div>
 
-<footer>© 2026 AI Resume Analyzer SaaS</footer>
-
 <script>
-async function analyzeResume() {
+let token = null;
+
+// Show login modal on page load
+document.getElementById("loginModal").style.display = "flex";
+
+async function login(){
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const loginMsg = document.getElementById('loginMsg');
+
+    try{
+        const res = await fetch("https://resumeanalyzer-5o8p.onrender.com/login",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({email, password})
+        });
+        const data = await res.json();
+        if(res.status===200){
+            token = data.token;
+            loginMsg.innerText = "✅ Logged in!";
+            document.getElementById("loginModal").style.display = "none";
+            document.getElementById("result").innerText = "You can now scan 1 resume for free!";
+        } else {
+            loginMsg.innerText = data.msg;
+        }
+    } catch(err){
+        loginMsg.innerText = "Error connecting to server.";
+    }
+}
+
+async function analyzeResume(){
+    if(!token){ alert("Please login first!"); return; }
+
     const resultDiv = document.getElementById('result');
     resultDiv.innerHTML = "Analyzing resume... 🔎";
 
@@ -92,41 +115,30 @@ async function analyzeResume() {
     const jdFile = document.getElementById('jd_file').files[0];
     if(jdFile) formData.append("jd_file", jdFile);
 
-    try {
-        const response = await fetch("https://resumeanalyzer-5o8p.onrender.com/analyze", {
-            method: "POST",
+    try{
+        const res = await fetch("https://resumeanalyzer-5o8p.onrender.com/analyze",{
+            method:"POST",
+            headers:{"Authorization": `Bearer ${token}`},
             body: formData
         });
-
-        const data = await response.json();
-
-        if(data.error) {
-            resultDiv.innerHTML = `<span style="color:#f87171;">❌ Error: ${data.error}</span>`;
-            return;
+        const data = await res.json();
+        if(data.error){
+            resultDiv.innerHTML = `<span style="color:#f87171;">❌ ${data.error}</span>`;
+        } else {
+            const scoreMatch = data.result.match(/ATS Score\s*[:\-]?\s*(\d{1,3})/i);
+            let atsScore = scoreMatch ? parseInt(scoreMatch[1]) : null;
+            let scoreHTML = '';
+            if(atsScore !== null){
+                scoreHTML = `
+                <div class="score-container">
+                    <div class="score-bar" style="width:${atsScore}%"><span>${atsScore}%</span></div>
+                </div><br>`;
+            }
+            resultDiv.innerHTML = `${scoreHTML}<strong>Improvement Suggestions:</strong>\n${data.result}`;
+            if(atsScore!==null) document.querySelector('.score-bar').style.width = atsScore+'%';
         }
-
-        // Extract ATS score if present (simple regex)
-        const scoreMatch = data.result.match(/ATS Score\s*[:\-]?\s*(\d{1,3})/i);
-        let atsScore = scoreMatch ? parseInt(scoreMatch[1]) : null;
-
-        let scoreHTML = '';
-        if(atsScore !== null){
-            scoreHTML = `
-            <div class="score-container">
-                <div class="score-bar" style="width:${atsScore}%;"><span>${atsScore}%</span></div>
-            </div><br>`;
-        }
-
-        resultDiv.innerHTML = `${scoreHTML}<strong>Improvement Suggestions:</strong>\n${data.result}`;
-
-        // Animate progress bar
-        if(atsScore !== null){
-            const bar = document.querySelector('.score-bar');
-            bar.style.width = atsScore + '%';
-        }
-
-    } catch(err) {
-        resultDiv.innerHTML = "<span style='color:#f87171;'>❌ Failed to fetch API. Make sure backend is running.</span>";
+    } catch(err){
+        resultDiv.innerHTML = "<span style='color:#f87171;'>❌ Failed to fetch API.</span>";
     }
 }
 </script>
