@@ -45,7 +45,7 @@ def analyze():
         resume_text = data.get("resume", "")
         jd_text = data.get("job_description", "")
 
-        # Check for file uploads
+        # Handle uploaded files
         if 'resume_file' in request.files:
             file = request.files['resume_file']
             if file and allowed_file(file.filename):
