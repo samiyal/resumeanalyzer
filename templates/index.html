@@ -7,15 +7,14 @@
     body {
       margin: 0;
       font-family: Arial;
-      background: #0f172a;
+      background: linear-gradient(135deg, #0f172a, #020617);
       color: white;
     }
 
     .header {
-      display: flex;
-      justify-content: center;
+      text-align: center;
       padding: 20px;
-      font-size: 24px;
+      font-size: 28px;
       font-weight: bold;
     }
 
@@ -23,7 +22,6 @@
       display: flex;
       gap: 20px;
       padding: 20px;
-      height: 60vh;
     }
 
     .box {
@@ -35,7 +33,7 @@
 
     textarea {
       width: 100%;
-      height: 150px;
+      height: 180px;
       margin-bottom: 10px;
       border-radius: 6px;
       padding: 10px;
@@ -46,9 +44,8 @@
       margin-top: 10px;
     }
 
-    .analyze-btn {
-      display: flex;
-      justify-content: center;
+    .center {
+      text-align: center;
       margin: 20px;
     }
 
@@ -73,6 +70,11 @@
       border-radius: 10px;
       white-space: pre-wrap;
     }
+
+    .download-btn {
+      margin-top: 10px;
+      background: #22c55e;
+    }
   </style>
 </head>
 
@@ -83,28 +85,27 @@
 <div class="container">
   <div class="box">
     <h3>Resume</h3>
-    <textarea id="resume_text" placeholder="Paste resume text..."></textarea>
+    <textarea id="resume_text"></textarea>
     <input type="file" id="resume_file">
   </div>
 
   <div class="box">
     <h3>Job Description</h3>
-    <textarea id="jd_text" placeholder="Paste job description..."></textarea>
+    <textarea id="jd_text"></textarea>
     <input type="file" id="jd_file">
   </div>
 </div>
 
-<div class="analyze-btn">
+<div class="center">
   <button onclick="analyze()">Analyze</button>
+  <button class="download-btn" onclick="downloadResume()">Download Improved Resume</button>
 </div>
-
 
 <div id="result">Result will appear here...</div>
 
 <script>
-let API = "https://resumeanalyzer-5o8p.onrender.com";
 
-async function analyze(){
+async function analyze() {
   let formData = new FormData();
 
   formData.append("resume_text", document.getElementById("resume_text").value);
@@ -113,14 +114,14 @@ async function analyze(){
   let resumeFile = document.getElementById("resume_file").files[0];
   let jdFile = document.getElementById("jd_file").files[0];
 
-  if(resumeFile) formData.append("resume_file", resumeFile);
-  if(jdFile) formData.append("jd_file", jdFile);
+  if (resumeFile) formData.append("resume_file", resumeFile);
+  if (jdFile) formData.append("jd_file", jdFile);
 
   document.getElementById("result").innerText = "Analyzing... ⏳";
 
-  let res = await fetch(API + "/analyze", {
-    method:"POST",
-    body:formData
+  let res = await fetch("/analyze", {
+    method: "POST",
+    body: formData
   });
 
   let data = await res.json();
@@ -128,6 +129,27 @@ async function analyze(){
   document.getElementById("result").innerText =
     data.result || data.msg;
 }
+
+
+// DOWNLOAD FEATURE
+function downloadResume() {
+  let text = document.getElementById("result").innerText;
+
+  if (!text.includes("Improved Resume")) {
+    alert("Run analysis first!");
+    return;
+  }
+
+  let improved = text.split("Improved Resume:")[1];
+
+  let blob = new Blob([improved], { type: "text/plain" });
+  let a = document.createElement("a");
+
+  a.href = URL.createObjectURL(blob);
+  a.download = "improved_resume.txt";
+  a.click();
+}
+
 </script>
 
 </body>
