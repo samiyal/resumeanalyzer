@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Resume Analyzer</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 50px;
+    }
+    textarea {
+      width: 80%;
+      height: 150px;
+      margin: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #22c55e;
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 20px;
+      white-space: pre-wrap;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🚀 AI Resume Analyzer</h1>
+
+<textarea id="resume" placeholder="Paste your resume here..."></textarea><br>
+
+<button onclick="analyze()">Analyze Resume</button>
+
+<div id="result"></div>
+
+<script>
+function analyze() {
+  document.getElementById("result").innerText = "Analyzing...";
+
+  fetch("https://resumeanalyzer-5o8p.onrender.com/analyze", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      text: document.getElementById("resume").value
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("result").innerText = data.result;
+  })
+  .catch(err => {
+    document.getElementById("result").innerText = "Error: " + err;
+  });
+}
+</script>
+
+</body>
+</html>
