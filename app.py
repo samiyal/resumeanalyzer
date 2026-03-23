@@ -31,8 +31,6 @@ def extract_text(file):
         return file.read().decode("utf-8", errors="ignore")
 
 
-
-
 @app.route("/")
 def serve_ui():
     return send_from_directory("static", "index.html")
@@ -82,12 +80,15 @@ def analyze():
 
         Suggestions:
         - bullet points
+
+        Improved Resume:
+        [Provide an improved version of the resume that incorporates the job description keywords and addresses the suggestions. Keep it concise and professional.]
         """
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=400,
+            max_tokens=800,  # Increased to accommodate improved resume
             timeout=20
         )
 

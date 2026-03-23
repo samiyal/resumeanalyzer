@@ -38,6 +38,7 @@
       border-radius: 6px;
       padding: 10px;
       border: none;
+      font-family: monospace;
     }
 
     input[type="file"] {
@@ -51,6 +52,7 @@
 
     button {
       padding: 12px 30px;
+      margin: 0 10px;
       border: none;
       border-radius: 8px;
       background: #3b82f6;
@@ -63,17 +65,27 @@
       background: #2563eb;
     }
 
+    .download-btn {
+      background: #22c55e;
+    }
+
+    .download-btn:hover {
+      background: #16a34a;
+    }
+
     #result {
       background: #020617;
       padding: 20px;
       margin: 20px;
       border-radius: 10px;
       white-space: pre-wrap;
+      font-family: monospace;
+      line-height: 1.5;
     }
 
-    .download-btn {
-      margin-top: 10px;
-      background: #22c55e;
+    .loading {
+      opacity: 0.7;
+      pointer-events: none;
     }
   </style>
 </head>
@@ -85,23 +97,23 @@
 <div class="container">
   <div class="box">
     <h3>Resume</h3>
-    <textarea id="resume_text"></textarea>
-    <input type="file" id="resume_file">
+    <textarea id="resume_text" placeholder="Paste your resume text here..."></textarea>
+    <input type="file" id="resume_file" accept=".txt,.pdf,.docx">
   </div>
 
   <div class="box">
     <h3>Job Description</h3>
-    <textarea id="jd_text"></textarea>
-    <input type="file" id="jd_file">
+    <textarea id="jd_text" placeholder="Paste job description here..."></textarea>
+    <input type="file" id="jd_file" accept=".txt,.pdf,.docx">
   </div>
 </div>
 
 <div class="center">
-  <button onclick="analyze()">Analyze</button>
-  <button class="download-btn" onclick="downloadResume()">Download Improved Resume</button>
+  <button onclick="analyze()">🔍 Analyze</button>
+  <button class="download-btn" onclick="downloadResume()">📥 Download Improved Resume</button>
 </div>
 
-<div id="result">Result will appear here...</div>
+<div id="result">✨ Result will appear here... ✨</div>
 
 <script>
 
@@ -117,37 +129,75 @@ async function analyze() {
   if (resumeFile) formData.append("resume_file", resumeFile);
   if (jdFile) formData.append("jd_file", jdFile);
 
-  document.getElementById("result").innerText = "Analyzing... ⏳";
+  const resultDiv = document.getElementById("result");
+  resultDiv.innerText = "🔄 Analyzing... Please wait... ⏳";
 
-  let res = await fetch("/analyze", {
-    method: "POST",
-    body: formData
-  });
+  try {
+    let res = await fetch("/analyze", {
+      method: "POST",
+      body: formData
+    });
 
-  let data = await res.json();
+    let data = await res.json();
 
-  document.getElementById("result").innerText =
-    data.result || data.msg;
+    if (data.result) {
+      resultDiv.innerText = data.result;
+    } else {
+      resultDiv.innerText = "Error: " + (data.msg || "Unknown error occurred");
+    }
+  } catch (error) {
+    resultDiv.innerText = "Error: " + error.message;
+  }
 }
 
-
-// DOWNLOAD FEATURE
+// DOWNLOAD FEATURE - FIXED VERSION
 function downloadResume() {
-  let text = document.getElementById("result").innerText;
-
-  if (!text.includes("Improved Resume")) {
-    alert("Run analysis first!");
+  const resultText = document.getElementById("result").innerText;
+  
+  // Check if we have analysis results
+  if (resultText.includes("Result will appear here") || resultText.includes("Analyzing")) {
+    alert("⚠️ Please run the analysis first!");
     return;
   }
 
-  let improved = text.split("Improved Resume:")[1];
+  // Extract the improved resume section
+  let improvedResume = "";
+  
+  // Look for "Improved Resume:" section
+  if (resultText.includes("Improved Resume:")) {
+    // Split by "Improved Resume:" and take the second part
+    improvedResume = resultText.split("Improved Resume:")[1];
+    
+    // Optional: Remove any trailing sections if needed
+    // Remove anything after "---" or similar separators if present
+    const sections = improvedResume.split(/\n(?=[A-Z\s]+:)/);
+    improvedResume = sections[0];
+  } else {
+    alert("⚠️ No improved resume found in the analysis. Please try analyzing again.");
+    return;
+  }
 
-  let blob = new Blob([improved], { type: "text/plain" });
-  let a = document.createElement("a");
+  // Clean up the extracted text
+  improvedResume = improvedResume.trim();
+  
+  if (improvedResume.length < 50) {
+    alert("⚠️ The improved resume section is too short. Please try analyzing again.");
+    return;
+  }
 
-  a.href = URL.createObjectURL(blob);
+  // Create and download the file
+  const blob = new Blob([improvedResume], { type: "text/plain" });
+  const a = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  
+  a.href = url;
   a.download = "improved_resume.txt";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  alert("✅ Improved resume downloaded successfully!");
 }
 
 </script>
