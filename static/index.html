@@ -45,6 +45,13 @@
       margin-top: 10px;
     }
 
+    .checkbox-container {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .center {
       text-align: center;
       margin: 20px;
@@ -81,11 +88,28 @@
       white-space: pre-wrap;
       font-family: monospace;
       line-height: 1.5;
+      max-height: 500px;
+      overflow-y: auto;
     }
 
     .loading {
       opacity: 0.7;
       pointer-events: none;
+    }
+
+    .format-badge {
+      display: inline-block;
+      background: #3b82f6;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-left: 10px;
+    }
+
+    .char-counter {
+      font-size: 12px;
+      margin-top: 5px;
+      color: #94a3b8;
     }
   </style>
 </head>
@@ -98,30 +122,90 @@
   <div class="box">
     <h3>Resume</h3>
     <textarea id="resume_text" placeholder="Paste your resume text here..."></textarea>
+    <div class="char-counter" id="resume_counter">0 / 3000 characters</div>
     <input type="file" id="resume_file" accept=".txt,.pdf,.docx">
+    <div class="checkbox-container">
+      <input type="checkbox" id="preserve_format" checked>
+      <label>Preserve original format (DOCX/PDF)</label>
+    </div>
   </div>
 
   <div class="box">
     <h3>Job Description</h3>
     <textarea id="jd_text" placeholder="Paste job description here..."></textarea>
+    <div class="char-counter" id="jd_counter">0 / 2000 characters</div>
     <input type="file" id="jd_file" accept=".txt,.pdf,.docx">
   </div>
 </div>
 
 <div class="center">
   <button onclick="analyze()">🔍 Analyze</button>
-  <button class="download-btn" onclick="downloadResume()">📥 Download Improved Resume</button>
+  <button class="download-btn" onclick="downloadImprovedResume()" id="downloadBtn" disabled>📥 Download Improved Resume</button>
 </div>
 
 <div id="result">✨ Result will appear here... ✨</div>
 
 <script>
 
+// Global variables to store analysis results
+let currentImprovedResume = "";
+let currentFormat = "txt";
+let currentFilename = "";
+
+// Character counters
+const resumeTextarea = document.getElementById('resume_text');
+const jdTextarea = document.getElementById('jd_text');
+const resumeCounter = document.getElementById('resume_counter');
+const jdCounter = document.getElementById('jd_counter');
+
+function updateCharCounters() {
+  resumeCounter.textContent = `${resumeTextarea.value.length} / 3000 characters`;
+  if (resumeTextarea.value.length > 3000) {
+    resumeCounter.style.color = '#ef4444';
+  } else {
+    resumeCounter.style.color = '#94a3b8';
+  }
+  
+  jdCounter.textContent = `${jdTextarea.value.length} / 2000 characters`;
+  if (jdTextarea.value.length > 2000) {
+    jdCounter.style.color = '#ef4444';
+  } else {
+    jdCounter.style.color = '#94a3b8';
+  }
+}
+
+resumeTextarea.addEventListener('input', updateCharCounters);
+jdTextarea.addEventListener('input', updateCharCounters);
+
+// Auto-truncate on paste
+resumeTextarea.addEventListener('paste', function(e) {
+  setTimeout(() => {
+    if (this.value.length > 3000) {
+      this.value = this.value.substring(0, 3000);
+      updateCharCounters();
+    }
+  }, 10);
+});
+
+jdTextarea.addEventListener('paste', function(e) {
+  setTimeout(() => {
+    if (this.value.length > 2000) {
+      this.value = this.value.substring(0, 2000);
+      updateCharCounters();
+    }
+  }, 10);
+});
+
 async function analyze() {
+  // Reset download button
+  document.getElementById("downloadBtn").disabled = true;
+  currentImprovedResume = "";
+  
   let formData = new FormData();
 
   formData.append("resume_text", document.getElementById("resume_text").value);
   formData.append("jd_text", document.getElementById("jd_text").value);
+  formData.append("preserve_format", document.getElementById("preserve_format").checked);
 
   let resumeFile = document.getElementById("resume_file").files[0];
   let jdFile = document.getElementById("jd_file").files[0];
@@ -142,6 +226,20 @@ async function analyze() {
 
     if (data.result) {
       resultDiv.innerText = data.result;
+      
+      // Store improved resume data if available
+      if (data.improved_resume) {
+        currentImprovedResume = data.improved_resume;
+        currentFormat = data.original_format || "txt";
+        currentFilename = data.original_filename || "resume";
+        document.getElementById("downloadBtn").disabled = false;
+        
+        // Add download hint
+        resultDiv.innerText += "\n\n✅ Improved resume generated! Click 'Download Improved Resume' to save it.";
+      } else {
+        document.getElementById("downloadBtn").disabled = true;
+        resultDiv.innerText += "\n\n⚠️ Could not generate improved resume. Please try again.";
+      }
     } else {
       resultDiv.innerText = "Error: " + (data.msg || "Unknown error occurred");
     }
@@ -150,55 +248,59 @@ async function analyze() {
   }
 }
 
-// DOWNLOAD FEATURE - FIXED VERSION
-function downloadResume() {
-  const resultText = document.getElementById("result").innerText;
-  
-  // Check if we have analysis results
-  if (resultText.includes("Result will appear here") || resultText.includes("Analyzing")) {
-    alert("⚠️ Please run the analysis first!");
+async function downloadImprovedResume() {
+  if (!currentImprovedResume) {
+    alert("⚠️ No improved resume available. Please run analysis first!");
     return;
   }
 
-  // Extract the improved resume section
-  let improvedResume = "";
-  
-  // Look for "Improved Resume:" section
-  if (resultText.includes("Improved Resume:")) {
-    // Split by "Improved Resume:" and take the second part
-    improvedResume = resultText.split("Improved Resume:")[1];
-    
-    // Optional: Remove any trailing sections if needed
-    // Remove anything after "---" or similar separators if present
-    const sections = improvedResume.split(/\n(?=[A-Z\s]+:)/);
-    improvedResume = sections[0];
-  } else {
-    alert("⚠️ No improved resume found in the analysis. Please try analyzing again.");
-    return;
-  }
+  try {
+    let response = await fetch("/download-improved", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        improved_text: currentImprovedResume,
+        format: currentFormat,
+        original_filename: currentFilename
+      })
+    });
 
-  // Clean up the extracted text
-  improvedResume = improvedResume.trim();
-  
-  if (improvedResume.length < 50) {
-    alert("⚠️ The improved resume section is too short. Please try analyzing again.");
-    return;
+    if (response.ok) {
+      // Get filename from Content-Disposition header or create one
+      let filename = `improved_resume.${currentFormat}`;
+      const contentDisposition = response.headers.get('Content-Disposition');
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '');
+        }
+      }
+      
+      // Download the file
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert(`✅ Improved resume downloaded successfully as ${filename}!`);
+    } else {
+      const error = await response.json();
+      alert("❌ Download failed: " + (error.msg || "Unknown error"));
+    }
+  } catch (error) {
+    alert("❌ Download failed: " + error.message);
   }
-
-  // Create and download the file
-  const blob = new Blob([improvedResume], { type: "text/plain" });
-  const a = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  
-  a.href = url;
-  a.download = "improved_resume.txt";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  
-  alert("✅ Improved resume downloaded successfully!");
 }
+
+// Initialize character counters
+updateCharCounters();
 
 </script>
 
